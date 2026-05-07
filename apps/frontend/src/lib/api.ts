@@ -1,0 +1,44 @@
+import type { Recommendation, PipelineRun, DashboardStats } from '@kalshi/shared';
+
+const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+
+async function get<T>(path: string): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, { next: { revalidate: 30 } });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json() as Promise<T>;
+}
+
+export async function getStats(): Promise<DashboardStats> {
+  return get('/api/pipeline/stats');
+}
+
+export async function getRecommendations(outcome = 'pending'): Promise<Recommendation[]> {
+  return get(`/api/recommendations?outcome=${outcome}&limit=100`);
+}
+
+export async function getRecommendation(id: string): Promise<Recommendation> {
+  return get(`/api/recommendations/${id}`);
+}
+
+export async function getPipelineStatus(): Promise<{ is_running: boolean; runs: PipelineRun[] }> {
+  return get('/api/pipeline/status');
+}
+
+export async function triggerPipeline(): Promise<{ message: string }> {
+  const res = await fetch(`${BASE}/api/pipeline/run`, { method: 'POST' });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+export async function markOutcome(
+  id: number,
+  outcome: 'won' | 'lost' | 'cancelled'
+): Promise<Recommendation> {
+  const res = await fetch(`${BASE}/api/recommendations/${id}/outcome`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ outcome }),
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}

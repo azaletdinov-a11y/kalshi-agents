@@ -1,0 +1,11 @@
+{
+  "name": "kalshi-agents",
+  "private": true,
+  "scripts": {
+    "dev:backend": "pnpm --filter backend dev",
+    "dev:frontend": "pnpm --filter frontend dev",
+    "build:backend": "pnpm --filter backend build",
+    "build:frontend": "pnpm --filter frontend build",
+    "migrate": "pnpm --filter backend migrate"
+  }
+}
