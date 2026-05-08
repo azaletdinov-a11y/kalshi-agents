@@ -54,21 +54,23 @@ export async function evaluateAndStore(
     return false;
   }
 
-  // Skip if we already have a pending rec with price unchanged (< 5pp move)
+  // Skip if we already have a pending rec with price AND estimate both stable
   const existing = await db.query(
-    `SELECT id, market_yes_price FROM recommendations
+    `SELECT id, market_yes_price, estimated_probability FROM recommendations
      WHERE market_ticker=$1 AND outcome='pending' ORDER BY created_at DESC LIMIT 1`,
     [market.ticker]
   );
   if (existing.rows.length > 0) {
     const oldPrice = Number(existing.rows[0].market_yes_price);
-    const delta = Math.abs(estimation.marketYesPrice - oldPrice);
-    if (delta < 5) {
-      console.log(`[RiskManager] ${market.ticker}: already pending, price unchanged (${oldPrice}%→${estimation.marketYesPrice}%), skipping`);
+    const oldEstimate = Number(existing.rows[0].estimated_probability);
+    const priceDelta = Math.abs(estimation.marketYesPrice - oldPrice);
+    const estimateDelta = Math.abs(estimation.estimated_probability - oldEstimate);
+    if (priceDelta < 5 && estimateDelta < 15) {
+      console.log(`[RiskManager] ${market.ticker}: already pending, price/estimate stable (price ${oldPrice}%→${estimation.marketYesPrice}%, est ${oldEstimate}%→${estimation.estimated_probability}%), skipping`);
       return false;
     }
     await db.query(`UPDATE recommendations SET outcome='cancelled' WHERE id=$1`, [existing.rows[0].id]);
-    console.log(`[RiskManager] ${market.ticker}: price moved ${delta}pp, replacing stale rec`);
+    console.log(`[RiskManager] ${market.ticker}: price/estimate moved (Δprice=${priceDelta}pp, Δest=${estimateDelta}pp), replacing stale rec`);
   }
 
   await db.query(

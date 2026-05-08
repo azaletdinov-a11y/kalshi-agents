@@ -70,7 +70,17 @@ export async function fetchFredData(ticker: string): Promise<string | null> {
     };
     if (series.units) params.units = series.units;
 
-    const res = await axios.get(`${BASE}/series/observations`, { params, timeout: 5000 });
+    let res;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        res = await axios.get(`${BASE}/series/observations`, { params, timeout: 8000 });
+        break;
+      } catch (e) {
+        if (attempt === 2) throw e;
+        await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+      }
+    }
+    if (!res) return null;
 
     const observations: Array<{ date: string; value: string }> = (res.data.observations ?? [])
       .filter((o: { date: string; value: string }) => o.value !== '.'); // FRED uses '.' for missing

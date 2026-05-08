@@ -20,16 +20,31 @@ When FRED data is present, follow this two-step logic:
 
 STEP A — Does the FRED data cover the SAME period the market is asking about?
   - Check the "latest data:" date in the FRED header and compare to the period in the market title.
-  - Example: market asks "Will CPI exceed 0.4% in April 2026?" and FRED shows "latest data: 2026-04-01" → YES, this is the April reading. Treat it as the answer.
-  - Example: market asks "Will GDP grow >1% in Q2 2026?" and FRED shows "latest data: Q1 2026" → NO, Q2 data is not yet available.
+  - Example: market asks "Will CPI exceed 0.4% in April 2026?" and FRED shows "latest data: 2026-04-01" → YES, this IS the April reading. Treat it as the answer.
+  - Example: market asks "Will CPI exceed 0.5% in April 2026?" and FRED shows "latest data: 2026-03-01" → NO, April data not yet available.
+  - Example: market asks "Will GDP grow >1% in Q2 2026?" and FRED shows "latest data: Q1 2026" → NO, Q2 not yet available.
 
-STEP B — Apply the appropriate reasoning:
-  - If FRED data IS for the measurement period: treat the value as ground truth and compare directly to the threshold. If FRED shows 0.865% and the threshold is 0.5%, the answer is YES (probability ~97-99%). If the threshold is 0.9%, the answer is NO (probability ~2-4%).
-  - If FRED data is from a PRIOR period (Q2 asked but only Q1 available): use the data as a strong prior, not the answer. Q1 GDP of 2.0% suggests Q2 will likely also be positive, but there's genuine uncertainty. Do NOT flip the probability 180° based on prior-period data.
+STEP B — Apply the appropriate reasoning based on indicator type:
+
+  If FRED data IS for the exact measurement period:
+  → Treat the value as ground truth. Compare directly to the threshold and give high confidence.
+
+  If FRED data is from a PRIOR period AND the indicator is MONTHLY (CPI, PCE, unemployment):
+  → Monthly readings are HIGHLY VARIABLE month to month. A 0.87% March CPI says very little about April or May.
+  → The market price is FAR MORE RELIABLE than prior-month data — it reflects actual economist forecasts, survey data, and trade flow analysis.
+  → Treat the market price as a strong anchor. Deviate by no more than 10pp unless news evidence strongly supports divergence.
+  → Use FRED only as background context (trend direction), not as a predictor.
+
+  If FRED data is from a PRIOR period AND the indicator is QUARTERLY (GDP):
+  → Quarterly data has more persistence than monthly. Prior quarter provides moderate signal.
+  → Still weight the market price heavily. Deviate no more than 20pp from market without compelling evidence.
+
+  If the indicator is the FED FUNDS RATE:
+  → The rate changes infrequently and only at FOMC meetings. If FRED shows the current rate, it is highly predictive of near-term rate markets.
 
 Additional rules:
 - The trend (↑ accelerating / ↓ decelerating) provides directional bias but not certainty.
-- Market consensus is often well-calibrated for future-period economic questions; don't diverge >15pp without strong evidence.
+- Never give 95%+ confidence on a prior-period economic market unless the measurement period's data is already published.
 
 Always respond with valid JSON only — no markdown, no extra text.`;
 
