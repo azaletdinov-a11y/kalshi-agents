@@ -22,7 +22,7 @@ function sign(method: string, path: string): Record<string, string> {
 }
 
 const client = axios.create({
-  baseURL: `https://trading-api.kalshi.com${BASE_PATH}`,
+  baseURL: `https://api.elections.kalshi.com${BASE_PATH}`,
 });
 
 client.interceptors.request.use((config) => {
