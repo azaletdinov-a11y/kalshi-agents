@@ -24,7 +24,7 @@ const BLOCKED_TITLE_WORDS = [
 
 export async function scanMarkets(): Promise<KalshiMarketRaw[]> {
   console.log('[Scanner] Fetching open markets from Kalshi...');
-  const all = await getOpenMarkets(5000);
+  const all = await getOpenMarkets(3000);
 
   const now = Date.now();
   const filtered = all.filter((m) => {

@@ -50,9 +50,12 @@ export function parsePrice(dollarStr?: string): number {
   return Math.round(parseFloat(dollarStr ?? '0') * 100);
 }
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 export async function getOpenMarkets(maxMarkets = 200): Promise<KalshiMarketRaw[]> {
   const markets: KalshiMarketRaw[] = [];
   let cursor: string | undefined;
+  let page = 0;
 
   do {
     const params: Record<string, string | number> = {
@@ -60,6 +63,9 @@ export async function getOpenMarkets(maxMarkets = 200): Promise<KalshiMarketRaw[
       limit: Math.min(maxMarkets - markets.length, 200),
     };
     if (cursor) params.cursor = cursor;
+
+    if (page > 0) await sleep(400); // stay within rate limits
+    page++;
 
     const res = await client.get('/markets', { params }).catch((err) => {
       if (axios.isAxiosError(err) && err.response) {
@@ -69,8 +75,11 @@ export async function getOpenMarkets(maxMarkets = 200): Promise<KalshiMarketRaw[
     });
 
     const data = res.data;
-    markets.push(...(data.markets ?? []));
+    const batch: KalshiMarketRaw[] = data.markets ?? [];
+    markets.push(...batch);
     cursor = data.cursor;
+
+    console.log(`[Kalshi] Page ${page}: +${batch.length} markets (total ${markets.length})`);
 
     if (!cursor || markets.length >= maxMarkets) break;
   } while (true);
