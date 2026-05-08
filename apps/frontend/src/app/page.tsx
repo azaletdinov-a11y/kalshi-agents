@@ -1,12 +1,13 @@
-import { getStats, getRecommendations, triggerPipeline } from '@/lib/api';
+import { getStats, getRecommendations } from '@/lib/api';
 import { RecommendationCard } from '@/components/RecommendationCard';
+import { PipelineControls } from '@/components/PipelineControls';
 
-export const revalidate = 30;
+export const revalidate = 0;
 
 export default async function DashboardPage() {
   const [stats, recs] = await Promise.all([
-    getStats().catch(() => null),
-    getRecommendations('pending').catch(() => []),
+    getStats().catch((e) => { console.error('[Dashboard] stats error:', e.message); return null; }),
+    getRecommendations('pending').catch((e) => { console.error('[Dashboard] recs error:', e.message); return []; }),
   ]);
 
   const top = recs.slice(0, 6);
@@ -15,17 +16,7 @@ export default async function DashboardPage() {
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Dashboard</h1>
-        <form action={async () => {
-          'use server';
-          try { await triggerPipeline(); } catch { /* backend unreachable */ }
-        }}>
-          <button
-            type="submit"
-            className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium transition-colors"
-          >
-            Run Pipeline Now
-          </button>
-        </form>
+        <PipelineControls />
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

@@ -1,6 +1,9 @@
 import type { Recommendation, PipelineRun, DashboardStats } from '@kalshi/shared';
 
-const BASE = process.env.API_URL ?? 'http://localhost:3001';
+const BASE =
+  process.env.API_URL ??
+  process.env.NEXT_PUBLIC_API_URL ??
+  'http://localhost:3001';
 
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE}${path}`, { next: { revalidate: 30 } });
