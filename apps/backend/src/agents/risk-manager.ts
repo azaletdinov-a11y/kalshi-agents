@@ -1,4 +1,5 @@
 import { KalshiMarketRaw } from '../lib/kalshi';
+import { inferCategory } from './market-scanner';
 import { EstimationResult } from './estimator';
 import { ResearchResult } from './researcher';
 import { db } from '../db/client';
@@ -79,7 +80,7 @@ export async function evaluateAndStore(
     [
       market.ticker,
       market.title,
-      market.category ?? 'Unknown',
+      market.category ?? inferCategory(market.ticker),
       estimation.marketYesPrice,
       estimation.estimated_probability,
       Math.round(edge * 100 * 10) / 10,

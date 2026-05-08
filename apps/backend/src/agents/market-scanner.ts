@@ -7,6 +7,23 @@ const MAX_DAYS_TO_CLOSE = 90;
 const MIN_PRICE = 5;
 const MAX_PRICE = 95;
 
+const CATEGORY_RULES: Array<{ prefixes: string[]; category: string }> = [
+  { prefixes: ['KXBTC', 'KXETH', 'KXSOL', 'KXBNB', 'KXXRP', 'KXDOGE', 'KXADA'], category: 'Crypto' },
+  { prefixes: ['KXFEDRATE', 'KXCPI', 'KXUNRATE', 'KXGDP', 'KXPCE', 'KXHPI', 'KXJOBS'], category: 'Economics' },
+  { prefixes: ['INXD', 'INXU', 'KXSPX', 'KXNQ', 'KXDJI', 'KXIPO', 'KXFREDDIE', 'KXFANNIE'], category: 'Finance' },
+  { prefixes: ['USPRES', 'USSENATE', 'USHOUSE', 'USGOV', 'KXELECTION', 'KXPOLITICS', 'KXVOTE', 'KXUKGOV', 'KXEUGOV'], category: 'Politics' },
+  { prefixes: ['KXWARMING', 'KXERUPT', 'KXHURRICANE', 'KXQUAKE', 'KXCLIMATE'], category: 'Climate' },
+  { prefixes: ['KXELON', 'KXMARS', 'KXAGICO', 'KXAI', 'KXSPACE'], category: 'Technology' },
+  { prefixes: ['KXMEDIA', 'KXALBUM', 'KXMARRIAGE', 'KXMOVIE', 'KXSHOW', 'KXOSCAR', 'KXGRAMMYS'], category: 'Entertainment' },
+];
+
+export function inferCategory(ticker: string): string {
+  for (const rule of CATEGORY_RULES) {
+    if (rule.prefixes.some((p) => ticker.startsWith(p))) return rule.category;
+  }
+  return 'Other';
+}
+
 // Known liquid series to query directly — financial, economic, crypto, political
 const PRIORITY_SERIES = [
   'KXBTCUSD', 'KXETHUSD', 'KXSOLUSD', 'KXBNBUSD', 'KXXRPUSD',
@@ -100,7 +117,7 @@ export async function scanMarkets(): Promise<KalshiMarketRaw[]> {
        ON CONFLICT (ticker) DO UPDATE SET
          yes_price = EXCLUDED.yes_price, volume = EXCLUDED.volume,
          volume_24h = EXCLUDED.volume_24h, scanned_at = NOW()`,
-      [m.ticker, m.title, m.category ?? 'Unknown', price, volume, volume24h, m.close_time]
+      [m.ticker, m.title, m.category ?? inferCategory(m.ticker), price, volume, volume24h, m.close_time]
     );
   }
 
