@@ -1,32 +1,30 @@
 import { getOpenMarkets, parsePrice, KalshiMarketRaw } from '../lib/kalshi';
 import { db } from '../db/client';
 
-const MIN_VOLUME = 100;
+const MIN_VOLUME = 10;
 const MIN_DAYS_TO_CLOSE = 1;
 const MAX_DAYS_TO_CLOSE = 90;
 const MIN_PRICE = 5;
 const MAX_PRICE = 95;
 
-// Categories with single, resolvable outcomes suitable for analysis
-const ALLOWED_CATEGORIES = new Set([
-  'Politics', 'Economics', 'Finance', 'Financials',
-  'Crypto', 'Cryptocurrency', 'Climate', 'Science',
-  'Technology', 'Health', 'Energy', 'Markets',
-]);
-
-// Multi-leg parlay and sports series tickers — not analytically tractable
+// Sports/parlay ticker series — multi-leg bets not suitable for single-outcome analysis
 const BLOCKED_PREFIXES = [
   'KXMVE', 'KXMLB', 'KXMNBA', 'KXMNFL', 'KXMNHL', 'KXMSO',
-  'KXSOC', 'KXTEN', 'KXGOLF',
+  'KXSOC', 'KXTEN', 'KXGOLF', 'KXNASCAR', 'KXMMA', 'KXBOXING',
+  'KXOLY', 'KXWWE',
+];
+
+// Sports title keywords that indicate non-analytical markets
+const BLOCKED_TITLE_WORDS = [
+  'MVP', 'Cy Young', 'Heisman', 'Super Bowl', 'Stanley Cup', 'NBA Finals',
+  'World Series', 'World Cup', 'Champions League', 'Premier League',
+  'touchdown', 'home run', 'hat trick', 'grand slam', 'hole-in-one',
+  'NASCAR', 'Formula 1', 'F1', 'UFC', 'boxing match',
 ];
 
 export async function scanMarkets(): Promise<KalshiMarketRaw[]> {
   console.log('[Scanner] Fetching open markets from Kalshi...');
   const all = await getOpenMarkets(1000);
-
-  // Log all unique categories from the API so we can tune the allowlist
-  const allCategories = [...new Set(all.map((m) => m.category ?? 'undefined'))].sort();
-  console.log(`[Scanner] All categories in API: ${JSON.stringify(allCategories)}`);
 
   const now = Date.now();
   const filtered = all.filter((m) => {
@@ -39,9 +37,13 @@ export async function scanMarkets(): Promise<KalshiMarketRaw[]> {
     const hasLiquidity = parseFloat(m.yes_ask_dollars ?? '0') > 0 || parseFloat(m.no_bid_dollars ?? '0') > 0;
 
     const isBlockedTicker = BLOCKED_PREFIXES.some((p) => m.ticker.startsWith(p));
+    const isBlockedTitle = BLOCKED_TITLE_WORDS.some((w) =>
+      m.title.toLowerCase().includes(w.toLowerCase())
+    );
 
     return (
       !isBlockedTicker &&
+      !isBlockedTitle &&
       volume >= MIN_VOLUME &&
       daysToClose >= MIN_DAYS_TO_CLOSE &&
       daysToClose <= MAX_DAYS_TO_CLOSE &&
