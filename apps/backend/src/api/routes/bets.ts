@@ -97,7 +97,7 @@ router.patch('/:id', async (req, res) => {
 });
 
 router.delete('/:id', async (req, res) => {
-  await db.query(`UPDATE bets SET outcome='cancelled' WHERE id=$1`, [req.params.id]);
+  await db.query(`DELETE FROM bets WHERE id=$1`, [req.params.id]);
   res.json({ ok: true });
 });
 
