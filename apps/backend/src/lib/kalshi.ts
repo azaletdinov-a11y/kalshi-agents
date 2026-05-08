@@ -3,7 +3,7 @@ import axios from 'axios';
 // Kalshi REST API v2
 // Auth: API key as Bearer token — adjust if you use RSA-based credentials
 const client = axios.create({
-  baseURL: 'https://api.kalshi.com/trade-api/v2',
+  baseURL: 'https://trading-api.kalshi.com/trade-api/v2',
   headers: {
     Authorization: `Bearer ${process.env.KALSHI_API_KEY}`,
     'Content-Type': 'application/json',
