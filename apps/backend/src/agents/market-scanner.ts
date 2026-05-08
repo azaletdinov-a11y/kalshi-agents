@@ -11,6 +11,10 @@ export async function scanMarkets(): Promise<KalshiMarketRaw[]> {
   console.log('[Scanner] Fetching open markets from Kalshi...');
   const all = await getOpenMarkets(500);
 
+  if (all.length > 0) {
+    console.log('[Scanner] Sample market fields:', JSON.stringify(all[0], null, 2));
+  }
+
   const now = Date.now();
   const filtered = all.filter((m) => {
     if (!m.close_time) return false;
