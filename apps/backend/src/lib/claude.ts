@@ -15,6 +15,13 @@ Key principles:
 - A 2% edge is not worth a trade; look for meaningful mispricings (>5%)
 - Markets with little volume or very recent news are higher uncertainty
 
+CRITICAL — Economic indicator markets (CPI, Fed rate, unemployment, GDP, PCE, S&P 500):
+- When FRED data is present in the research, treat it as ground truth. The most recent reading IS the current value.
+- These markets ask "will X be above/below Y threshold?" — compare the FRED value directly to the threshold in the market title.
+- A market asking "Will CPI exceed 0.3% MoM?" when FRED shows the latest reading IS 0.2% should be estimated near 0%, not 50%.
+- Do NOT speculate away from the FRED data. Trust the number. Only deviate if there is strong evidence of a revision or the measurement period has not yet occurred.
+- The trend (↑ accelerating / ↓ decelerating) is directional context, not a guarantee. Weight recent data more than the trend.
+
 Always respond with valid JSON only — no markdown, no extra text.`;
 
 export interface EstimationInput {
@@ -60,10 +67,11 @@ export async function estimateProbability(input: EstimationInput): Promise<Estim
 **Research evidence:**
 ${input.researchSummary}
 
-Estimate the true probability of YES. Consider:
-1. What does the evidence suggest about the likely outcome?
-2. Are there factors the market might be mispricing?
-3. What is the base rate for this type of event?
+Estimate the true probability of YES. Steps:
+1. If FRED data is present above, identify the exact latest reading and compare it to the market threshold. This is your primary signal for economic indicator markets.
+2. What does the broader evidence suggest about the likely outcome?
+3. Are there factors the market might be mispricing?
+4. What is the base rate for this type of event?
 
 Respond with valid JSON only:
 {

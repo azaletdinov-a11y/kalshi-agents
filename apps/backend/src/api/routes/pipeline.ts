@@ -17,7 +17,7 @@ router.get('/status', async (_req, res) => {
 router.get('/stats', async (_req, res) => {
   const [activeRec, lastRun, history] = await Promise.all([
     db.query(`SELECT COUNT(*) FROM recommendations WHERE outcome='pending'`),
-    db.query(`SELECT * FROM pipeline_runs ORDER BY started_at DESC LIMIT 1`),
+    db.query(`SELECT * FROM pipeline_runs WHERE status='completed' ORDER BY completed_at DESC LIMIT 1`),
     db.query(`SELECT outcome, COUNT(*) FROM recommendations WHERE outcome != 'pending' GROUP BY outcome`),
   ]);
 
