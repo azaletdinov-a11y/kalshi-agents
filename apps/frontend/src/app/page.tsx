@@ -44,18 +44,18 @@ export default async function DashboardPage() {
         />
       </div>
 
-      {ev && (
+      {ev && ev.pending_count > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           <StatCard
-            label="Expected Value (open bets)"
+            label="Expected P&L (pending bets)"
             value={ev.total_ev > 0 ? `+$${ev.total_ev.toFixed(2)}` : `$${ev.total_ev.toFixed(2)}`}
           />
           <StatCard
-            label="Total Exposure"
+            label="Amount at Risk"
             value={`$${ev.total_exposure.toFixed(2)}`}
           />
           <StatCard
-            label="Open Positions"
+            label="Pending Bets"
             value={ev.pending_count}
           />
         </div>

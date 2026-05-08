@@ -29,11 +29,12 @@ router.get('/calibration', async (_req, res) => {
 router.get('/ev-summary', async (_req, res) => {
   const result = await db.query(`
     SELECT
-      COALESCE(SUM(edge * recommended_bet / 100), 0) AS total_ev,
-      COALESCE(SUM(recommended_bet), 0) AS total_exposure,
+      COALESCE(SUM(r.edge * b.amount / 100), 0) AS total_ev,
+      COALESCE(SUM(b.amount), 0) AS total_exposure,
       COUNT(*) AS pending_count
-    FROM recommendations
-    WHERE outcome = 'pending'
+    FROM bets b
+    JOIN recommendations r ON b.recommendation_id = r.id
+    WHERE b.outcome = 'pending'
   `);
   const row = result.rows[0];
   res.json({
