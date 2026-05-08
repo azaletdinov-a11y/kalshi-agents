@@ -7,13 +7,14 @@ interface FredSeries {
   label: string;
   unit: string;
   frequency: 'monthly' | 'quarterly' | 'daily';
+  units?: string; // FRED units transform: 'pch' = percent change, 'pc1' = pct change from year ago, etc.
 }
 
 // Kalshi ticker prefix → FRED series
 const SERIES_MAP: Array<{ prefix: string; series: FredSeries }> = [
   {
     prefix: 'KXCPI',
-    series: { id: 'CPIAUCSLPCH', label: 'CPI Month-over-Month % Change', unit: '%', frequency: 'monthly' },
+    series: { id: 'CPIAUCSL', label: 'CPI Month-over-Month % Change', unit: '%', frequency: 'monthly', units: 'pch' },
   },
   {
     prefix: 'KXFEDRATE',
@@ -29,7 +30,7 @@ const SERIES_MAP: Array<{ prefix: string; series: FredSeries }> = [
   },
   {
     prefix: 'KXPCE',
-    series: { id: 'PCEPIILFE', label: 'Core PCE Month-over-Month % Change', unit: '%', frequency: 'monthly' },
+    series: { id: 'PCEPIILFE', label: 'Core PCE Month-over-Month % Change', unit: '%', frequency: 'monthly', units: 'pch' },
   },
   {
     prefix: 'INXD',
@@ -60,16 +61,16 @@ export async function fetchFredData(ticker: string): Promise<string | null> {
   try {
     const limit = series.frequency === 'daily' ? 30 : series.frequency === 'quarterly' ? 8 : 13;
 
-    const res = await axios.get(`${BASE}/series/observations`, {
-      params: {
-        series_id: series.id,
-        api_key: apiKey,
-        file_type: 'json',
-        sort_order: 'desc',
-        limit,
-      },
-      timeout: 5000,
-    });
+    const params: Record<string, string | number> = {
+      series_id: series.id,
+      api_key: apiKey,
+      file_type: 'json',
+      sort_order: 'desc',
+      limit,
+    };
+    if (series.units) params.units = series.units;
+
+    const res = await axios.get(`${BASE}/series/observations`, { params, timeout: 5000 });
 
     const observations: Array<{ date: string; value: string }> = (res.data.observations ?? [])
       .filter((o: { date: string; value: string }) => o.value !== '.'); // FRED uses '.' for missing
