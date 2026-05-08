@@ -15,12 +15,24 @@ export async function getStats(): Promise<DashboardStats> {
   return get('/api/pipeline/stats');
 }
 
+function normalizeRec(r: Recommendation): Recommendation {
+  return {
+    ...r,
+    market_yes_price: Number(r.market_yes_price),
+    estimated_probability: Number(r.estimated_probability),
+    edge: Number(r.edge),
+    kelly_fraction: Number(r.kelly_fraction),
+    recommended_bet: Number(r.recommended_bet),
+  };
+}
+
 export async function getRecommendations(outcome = 'pending'): Promise<Recommendation[]> {
-  return get(`/api/recommendations?outcome=${outcome}&limit=100`);
+  const recs = await get<Recommendation[]>(`/api/recommendations?outcome=${outcome}&limit=100`);
+  return recs.map(normalizeRec);
 }
 
 export async function getRecommendation(id: string): Promise<Recommendation> {
-  return get(`/api/recommendations/${id}`);
+  return normalizeRec(await get<Recommendation>(`/api/recommendations/${id}`));
 }
 
 export async function getPipelineStatus(): Promise<{ is_running: boolean; runs: PipelineRun[] }> {
