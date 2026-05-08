@@ -6,13 +6,10 @@ const BASE_PATH = '/trade-api/v2';
 function sign(method: string, path: string): Record<string, string> {
   const timestamp = Date.now().toString();
   const message = `${timestamp}${method.toUpperCase()}${path}`;
-
   const privateKey = (process.env.KALSHI_PRIVATE_KEY ?? '').replace(/\\n/g, '\n');
-
   const signer = crypto.createSign('RSA-SHA256');
   signer.update(message);
   const signature = signer.sign(privateKey, 'base64');
-
   return {
     'KALSHI-ACCESS-KEY': process.env.KALSHI_KEY_ID ?? '',
     'KALSHI-ACCESS-SIGNATURE': signature,
@@ -27,26 +24,29 @@ const client = axios.create({
 
 client.interceptors.request.use((config) => {
   const path = `${BASE_PATH}${config.url ?? ''}`;
-  const method = config.method?.toUpperCase() ?? 'GET';
-  Object.assign(config.headers, sign(method, path));
+  Object.assign(config.headers, sign(config.method?.toUpperCase() ?? 'GET', path));
   return config;
 });
 
+// All dollar fields are strings in "0.0000" format (0–1 range = 0%–100%)
 export interface KalshiMarketRaw {
   ticker: string;
   title: string;
-  category: string;
+  category?: string;
   status: string;
-  yes_bid: number;
-  yes_ask: number;
-  no_bid: number;
-  no_ask: number;
-  last_price: number;
-  volume: number;
-  volume_24h: number;
+  yes_bid_dollars?: string;
+  yes_ask_dollars?: string;
+  no_bid_dollars?: string;
+  no_ask_dollars?: string;
+  volume_fp?: string;
+  volume_24h_fp?: string;
   close_time: string;
-  open_interest: number;
-  liquidity: number;
+  open_interest_fp?: string;
+  liquidity_dollars?: string;
+}
+
+export function parsePrice(dollarStr?: string): number {
+  return Math.round(parseFloat(dollarStr ?? '0') * 100);
 }
 
 export async function getOpenMarkets(maxMarkets = 200): Promise<KalshiMarketRaw[]> {
@@ -62,10 +62,11 @@ export async function getOpenMarkets(maxMarkets = 200): Promise<KalshiMarketRaw[
 
     const res = await client.get('/markets', { params }).catch((err) => {
       if (axios.isAxiosError(err) && err.response) {
-        console.error('[Kalshi] Auth error', err.response.status, JSON.stringify(err.response.data));
+        console.error('[Kalshi] Error', err.response.status, JSON.stringify(err.response.data));
       }
       throw err;
     });
+
     const data = res.data;
     markets.push(...(data.markets ?? []));
     cursor = data.cursor;
