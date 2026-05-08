@@ -1,7 +1,7 @@
 import { getOpenMarkets, parsePrice, KalshiMarketRaw } from '../lib/kalshi';
 import { db } from '../db/client';
 
-const MIN_VOLUME = 500;
+const MIN_VOLUME = 100;
 const MIN_DAYS_TO_CLOSE = 1;
 const MAX_DAYS_TO_CLOSE = 90;
 const MIN_PRICE = 5;
