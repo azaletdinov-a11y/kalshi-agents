@@ -76,6 +76,11 @@ Respond with valid JSON only:
     ],
   });
 
-  const text = response.content[0].type === 'text' ? response.content[0].text : '';
-  return JSON.parse(text) as EstimationOutput;
+  const raw = response.content[0].type === 'text' ? response.content[0].text : '';
+  // Strip markdown code fences and extract the JSON object
+  const text = raw.replace(/```(?:json)?\s*/g, '').replace(/```/g, '').trim();
+  const jsonStart = text.indexOf('{');
+  const jsonEnd = text.lastIndexOf('}');
+  const json = text.slice(jsonStart, jsonEnd + 1);
+  return JSON.parse(json) as EstimationOutput;
 }
