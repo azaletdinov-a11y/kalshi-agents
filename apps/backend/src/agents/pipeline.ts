@@ -21,6 +21,16 @@ export async function runPipeline(): Promise<{ marketsScanned: number; recommend
   let recommendationsGenerated = 0;
 
   try {
+    // Expire pending recs whose markets have already closed
+    const expired = await db.query(
+      `UPDATE recommendations SET outcome='cancelled'
+       WHERE outcome='pending' AND close_time < NOW()
+       RETURNING market_ticker`
+    );
+    if (expired.rowCount && expired.rowCount > 0) {
+      console.log(`[Pipeline] Expired ${expired.rowCount} closed-market recommendations`);
+    }
+
     const markets = await scanMarkets();
     marketsScanned = markets.length;
 
