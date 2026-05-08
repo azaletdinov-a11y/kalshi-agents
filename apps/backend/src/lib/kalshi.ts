@@ -60,7 +60,12 @@ export async function getOpenMarkets(maxMarkets = 200): Promise<KalshiMarketRaw[
     };
     if (cursor) params.cursor = cursor;
 
-    const res = await client.get('/markets', { params });
+    const res = await client.get('/markets', { params }).catch((err) => {
+      if (axios.isAxiosError(err) && err.response) {
+        console.error('[Kalshi] Auth error', err.response.status, JSON.stringify(err.response.data));
+      }
+      throw err;
+    });
     const data = res.data;
     markets.push(...(data.markets ?? []));
     cursor = data.cursor;
