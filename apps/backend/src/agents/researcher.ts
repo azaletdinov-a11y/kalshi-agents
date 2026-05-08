@@ -1,6 +1,7 @@
 import { KalshiMarketRaw } from '../lib/kalshi';
 import { searchTavily } from '../lib/tavily';
 import { searchNews } from '../lib/news';
+import { fetchFredData } from '../lib/fred';
 
 export interface ResearchResult {
   ticker: string;
@@ -29,13 +30,18 @@ export async function researchMarket(market: KalshiMarketRaw): Promise<ResearchR
   const query = buildQuery(market);
   console.log(`[Researcher] Searching: "${query}"`);
 
-  const [tavilyText, newsText] = await Promise.allSettled([
+  const [tavilyText, newsText, fredText] = await Promise.allSettled([
     searchTavily(query),
     searchNews(query),
+    fetchFredData(market.ticker),
   ]);
 
   const parts: string[] = [];
 
+  // FRED data goes first — it's the highest-quality source for economic markets
+  if (fredText.status === 'fulfilled' && fredText.value) {
+    parts.push(fredText.value);
+  }
   if (tavilyText.status === 'fulfilled' && tavilyText.value) {
     parts.push('=== Web Search ===\n' + tavilyText.value);
   }
