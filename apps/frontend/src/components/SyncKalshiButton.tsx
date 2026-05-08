@@ -13,12 +13,16 @@ export function SyncKalshiButton() {
     setState('syncing');
     try {
       const r = await syncKalshiBets();
+      if (r.errors.length > 0) {
+        alert(`Sync errors:\n${r.errors.join('\n')}`);
+      }
       setResult({ imported: r.imported, skipped: r.skipped });
       setState('done');
       router.refresh();
       setTimeout(() => setState('idle'), 4000);
-    } catch {
-      alert('Sync failed. Check that KALSHI_KEY_ID and KALSHI_PRIVATE_KEY are set.');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      alert(`Sync failed: ${msg}`);
       setState('idle');
     }
   }

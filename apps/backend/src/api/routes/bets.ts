@@ -134,10 +134,20 @@ router.get('/kalshi-fills-debug', async (_req, res) => {
 });
 
 router.post('/sync-kalshi', async (_req, res) => {
-  const [fills, orders] = await Promise.all([
-    getMyFills(),
-    getMyOrders(),
-  ]);
+  let fills: Awaited<ReturnType<typeof getMyFills>> = [];
+  let orders: Awaited<ReturnType<typeof getMyOrders>> = [];
+  const fetchErrors: string[] = [];
+
+  try { fills = await getMyFills(); } catch (e: unknown) {
+    fetchErrors.push(`fills: ${e instanceof Error ? e.message : String(e)}`);
+  }
+  try { orders = await getMyOrders(); } catch (e: unknown) {
+    fetchErrors.push(`orders: ${e instanceof Error ? e.message : String(e)}`);
+  }
+
+  if (fetchErrors.length === 2) {
+    return res.status(502).json({ error: fetchErrors.join(' | ') });
+  }
 
   // Normalise fills and orders into a common shape with a unique key
   type Entry = { key: string; ticker: string; side: 'yes' | 'no'; fillPrice: number; amount: number; placedAt: string };
@@ -217,7 +227,7 @@ router.post('/sync-kalshi', async (_req, res) => {
   }
 
   console.log(`[Bets] Kalshi sync: ${imported} imported, ${skipped} already existed (${fills.length} fills + ${orders.length} orders)`);
-  res.json({ imported, skipped, total_fills: fills.length, total_orders: orders.length, errors });
+  res.json({ imported, skipped, total_fills: fills.length, total_orders: orders.length, errors: [...fetchErrors, ...errors] });
 });
 
 router.delete('/:id', async (req, res) => {
