@@ -1,5 +1,6 @@
 import cron from 'node-cron';
 import { runPipeline } from '../agents/pipeline';
+import { resolveSettledMarkets } from '../agents/resolver';
 
 export function startScheduler(): void {
   const schedule = process.env.PIPELINE_SCHEDULE ?? '0 */2 * * *';
@@ -15,6 +16,16 @@ export function startScheduler(): void {
       await runPipeline();
     } catch (err) {
       console.error('[Scheduler] Pipeline run failed:', err);
+    }
+  });
+
+  // Check for settled markets every hour
+  cron.schedule('15 * * * *', async () => {
+    console.log('[Scheduler] Checking for settled markets...');
+    try {
+      await resolveSettledMarkets();
+    } catch (err) {
+      console.error('[Scheduler] Resolver failed:', err);
     }
   });
 

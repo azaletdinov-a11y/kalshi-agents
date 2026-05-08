@@ -81,7 +81,7 @@ export interface KalshiEvent {
   markets?: KalshiMarketRaw[];
 }
 
-export async function getOpenEvents(maxEvents = 1000): Promise<KalshiEvent[]> {
+export async function getOpenEvents(maxEvents = 2000): Promise<KalshiEvent[]> {
   const events: KalshiEvent[] = [];
   let cursor: string | undefined;
   let page = 0;
@@ -115,6 +115,28 @@ export async function getMarketsForEvent(eventTicker: string): Promise<KalshiMar
     limit: 200,
   });
   return data.markets ?? [];
+}
+
+export interface KalshiMarketResolved extends KalshiMarketRaw {
+  result: string; // "yes" | "no" | "" when unresolved
+}
+
+export async function getMarket(ticker: string): Promise<KalshiMarketResolved> {
+  const data = await apiGet<{ market: KalshiMarketResolved }>(`/markets/${ticker}`);
+  return data.market;
+}
+
+export async function getMarketsBySeriesTicker(seriesTicker: string): Promise<KalshiMarketRaw[]> {
+  try {
+    const data = await apiGet<{ markets: KalshiMarketRaw[] }>('/markets', {
+      series_ticker: seriesTicker,
+      status: 'open',
+      limit: 200,
+    });
+    return data.markets ?? [];
+  } catch {
+    return [];
+  }
 }
 
 // Kept for backward compat but no longer used by the scanner

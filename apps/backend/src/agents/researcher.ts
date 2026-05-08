@@ -9,12 +9,20 @@ export interface ResearchResult {
 }
 
 function buildQuery(market: KalshiMarketRaw): string {
-  // Strip common prediction market boilerplate to get a clean search query
-  return market.title
-    .replace(/\b(will|by|before|end of|at least|more than|above|below)\b/gi, '')
+  const year = new Date().getFullYear();
+  const cleaned = market.title
+    // Remove prediction market boilerplate
+    .replace(/\b(will|when|officially|worldwide|globally|announced?)\b/gi, '')
+    // Remove future date constraints — we want current-state news
+    .replace(/\b(before|by|end of|at least|more than|above|below)\b/gi, '')
+    .replace(/\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2},?\s+\d{4}\b/gi, '')
+    .replace(/\b\d{1,2}\/\d{1,2}\/\d{4}\b/g, '')
     .replace(/\?$/, '')
-    .trim()
-    .slice(0, 120);
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  // Append year so search engines surface recent coverage
+  return `${cleaned} ${year}`.slice(0, 120);
 }
 
 export async function researchMarket(market: KalshiMarketRaw): Promise<ResearchResult> {

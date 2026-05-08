@@ -53,6 +53,23 @@ export async function evaluateAndStore(
     return false;
   }
 
+  // Skip if we already have a pending rec with price unchanged (< 5pp move)
+  const existing = await db.query(
+    `SELECT id, market_yes_price FROM recommendations
+     WHERE market_ticker=$1 AND outcome='pending' ORDER BY created_at DESC LIMIT 1`,
+    [market.ticker]
+  );
+  if (existing.rows.length > 0) {
+    const oldPrice = Number(existing.rows[0].market_yes_price);
+    const delta = Math.abs(estimation.marketYesPrice - oldPrice);
+    if (delta < 5) {
+      console.log(`[RiskManager] ${market.ticker}: already pending, price unchanged (${oldPrice}%→${estimation.marketYesPrice}%), skipping`);
+      return false;
+    }
+    await db.query(`UPDATE recommendations SET outcome='cancelled' WHERE id=$1`, [existing.rows[0].id]);
+    console.log(`[RiskManager] ${market.ticker}: price moved ${delta}pp, replacing stale rec`);
+  }
+
   await db.query(
     `INSERT INTO recommendations
       (market_ticker, market_title, category, market_yes_price, estimated_probability,

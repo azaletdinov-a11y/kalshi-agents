@@ -1,4 +1,4 @@
-import { getOpenEvents, getMarketsForEvent, parsePrice, KalshiMarketRaw } from '../lib/kalshi';
+import { getOpenEvents, getMarketsForEvent, getMarketsBySeriesTicker, parsePrice, KalshiMarketRaw } from '../lib/kalshi';
 import { db } from '../db/client';
 
 const MIN_VOLUME = 10;
@@ -6,6 +6,15 @@ const MIN_DAYS_TO_CLOSE = 1;
 const MAX_DAYS_TO_CLOSE = 90;
 const MIN_PRICE = 5;
 const MAX_PRICE = 95;
+
+// Known liquid series to query directly — financial, economic, crypto, political
+const PRIORITY_SERIES = [
+  'KXBTCUSD', 'KXETHUSD', 'KXSOLUSD', 'KXBNBUSD', 'KXXRPUSD',
+  'KXFEDRATE', 'KXCPI', 'KXUNRATE', 'KXGDP', 'KXPCE',
+  'INXD', 'INXU', 'KXSPXCLOSE', 'KXNQ100',
+  'USPRESIDENTIAL', 'USSENATE', 'USHOUSE', 'USGOV',
+  'KXELECTION', 'KXPOLITICS',
+];
 
 // Event ticker prefixes for sports/entertainment — skip entire events
 const BLOCKED_EVENT_PREFIXES = [
@@ -35,22 +44,41 @@ function isGoodMarket(m: KalshiMarketRaw, now: number): boolean {
 }
 
 export async function scanMarkets(): Promise<KalshiMarketRaw[]> {
+  const now = Date.now();
+  const allMarkets: KalshiMarketRaw[] = [];
+  const seenTickers = new Set<string>();
+
+  function addMarkets(markets: KalshiMarketRaw[]) {
+    for (const m of markets) {
+      if (!seenTickers.has(m.ticker) && isGoodMarket(m, now)) {
+        seenTickers.add(m.ticker);
+        allMarkets.push(m);
+      }
+    }
+  }
+
+  // 1. Targeted queries for known liquid series (financial, crypto, economic, political)
+  console.log('[Scanner] Querying priority series...');
+  for (const series of PRIORITY_SERIES) {
+    const markets = await getMarketsBySeriesTicker(series);
+    if (markets.length > 0) {
+      console.log(`[Scanner] Series ${series}: ${markets.length} markets`);
+      addMarkets(markets);
+    }
+  }
+
+  // 2. Event-based scan for everything else (novelty, IPO, entertainment futures)
   console.log('[Scanner] Fetching open events from Kalshi...');
-  const allEvents = await getOpenEvents();
+  const allEvents = await getOpenEvents(2000);
 
   const goodEvents = allEvents.filter(
     (e) => !BLOCKED_EVENT_PREFIXES.some((p) => e.event_ticker.startsWith(p))
-  ).slice(0, 300); // cap to avoid multi-minute market fetching
+  ).slice(0, 400);
   console.log(`[Scanner] ${allEvents.length} events → ${goodEvents.length} selected for market fetch`);
-  console.log('[Scanner] Sample events:', goodEvents.slice(0, 5).map((e) => e.event_ticker).join(', '));
-
-  const now = Date.now();
-  const allMarkets: KalshiMarketRaw[] = [];
 
   for (const event of goodEvents) {
     const markets = await getMarketsForEvent(event.event_ticker);
-    const good = markets.filter((m) => isGoodMarket(m, now));
-    allMarkets.push(...good);
+    addMarkets(markets);
   }
 
   allMarkets.sort((a, b) => parseFloat(b.volume_24h_fp ?? '0') - parseFloat(a.volume_24h_fp ?? '0'));
