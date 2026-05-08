@@ -62,7 +62,7 @@ export async function scanMarkets(): Promise<KalshiMarketRaw[]> {
     return acc;
   }, {});
   console.log(`[Scanner] ${all.length} fetched → ${filtered.length} after filters → ${candidates.length} candidates`);
-  console.log(`[Scanner] Categories: ${JSON.stringify(categoryBreakdown)}`);
+  candidates.forEach((m) => console.log(`[Scanner]  · ${m.ticker}: ${m.title}`));
 
   for (const m of candidates) {
     const yesAsk = parsePrice(m.yes_ask_dollars) || (100 - parsePrice(m.no_bid_dollars));
