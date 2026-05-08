@@ -27,31 +27,30 @@ export async function scanMarkets(): Promise<KalshiMarketRaw[]> {
   const all = await getOpenMarkets(1000);
 
   const now = Date.now();
+  const reasons = { blocked: 0, volume: 0, days: 0, price: 0, liquidity: 0 };
+
+  // Log a few raw samples so we can inspect the actual field values
+  console.log('[Scanner] Sample market:', JSON.stringify(all[0]));
+  console.log('[Scanner] Sample market:', JSON.stringify(all[1]));
+
   const filtered = all.filter((m) => {
     if (!m.close_time) return false;
     const daysToClose = (new Date(m.close_time).getTime() - now) / (1000 * 60 * 60 * 24);
     const volume = parseFloat(m.volume_fp ?? '0');
-
-    // Derive YES ask price: prefer yes_ask_dollars, fall back to (1 - no_bid)
     const yesAsk = parsePrice(m.yes_ask_dollars) || (100 - parsePrice(m.no_bid_dollars));
     const hasLiquidity = parseFloat(m.yes_ask_dollars ?? '0') > 0 || parseFloat(m.no_bid_dollars ?? '0') > 0;
-
     const isBlockedTicker = BLOCKED_PREFIXES.some((p) => m.ticker.startsWith(p));
-    const isBlockedTitle = BLOCKED_TITLE_WORDS.some((w) =>
-      m.title.toLowerCase().includes(w.toLowerCase())
-    );
+    const isBlockedTitle = BLOCKED_TITLE_WORDS.some((w) => m.title.toLowerCase().includes(w.toLowerCase()));
 
-    return (
-      !isBlockedTicker &&
-      !isBlockedTitle &&
-      volume >= MIN_VOLUME &&
-      daysToClose >= MIN_DAYS_TO_CLOSE &&
-      daysToClose <= MAX_DAYS_TO_CLOSE &&
-      yesAsk >= MIN_PRICE &&
-      yesAsk <= MAX_PRICE &&
-      hasLiquidity
-    );
+    if (isBlockedTicker || isBlockedTitle) { reasons.blocked++; return false; }
+    if (volume < MIN_VOLUME) { reasons.volume++; return false; }
+    if (daysToClose < MIN_DAYS_TO_CLOSE || daysToClose > MAX_DAYS_TO_CLOSE) { reasons.days++; return false; }
+    if (yesAsk < MIN_PRICE || yesAsk > MAX_PRICE) { reasons.price++; return false; }
+    if (!hasLiquidity) { reasons.liquidity++; return false; }
+    return true;
   });
+
+  console.log('[Scanner] Filter breakdown:', JSON.stringify(reasons));
 
   filtered.sort((a, b) => parseFloat(b.volume_24h_fp ?? '0') - parseFloat(a.volume_24h_fp ?? '0'));
 
