@@ -157,6 +157,42 @@ export async function getMyFills(maxFills = 2000): Promise<KalshiFill[]> {
   return fills;
 }
 
+export interface KalshiOrder {
+  order_id: string;
+  ticker: string;
+  side: 'yes' | 'no';
+  action: 'buy' | 'sell';
+  type: 'limit' | 'market';
+  status: string; // 'resting' | 'canceled' | 'executed' | 'pending'
+  yes_price: number;
+  no_price: number;
+  count: number;           // original order size in contracts
+  remaining_count: number; // unfilled contracts
+  filled_count: number;    // filled contracts so far
+  created_time: string;
+  close_time?: string;
+}
+
+export async function getMyOrders(status?: string, maxOrders = 2000): Promise<KalshiOrder[]> {
+  const orders: KalshiOrder[] = [];
+  let cursor: string | undefined;
+
+  do {
+    const params: Record<string, string | number> = { limit: Math.min(100, maxOrders - orders.length) };
+    if (status) params.status = status;
+    if (cursor) params.cursor = cursor;
+    if (orders.length > 0) await sleep(400);
+
+    const data = await apiGet<{ orders: KalshiOrder[]; cursor?: string }>('/portfolio/orders', params);
+    orders.push(...(data.orders ?? []));
+    cursor = data.cursor;
+
+    if (!cursor || orders.length >= maxOrders) break;
+  } while (true);
+
+  return orders;
+}
+
 export async function getMarketsBySeriesTicker(seriesTicker: string): Promise<KalshiMarketRaw[]> {
   try {
     const data = await apiGet<{ markets: KalshiMarketRaw[] }>('/markets', {
