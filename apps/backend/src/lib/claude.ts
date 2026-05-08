@@ -16,11 +16,20 @@ Key principles:
 - Markets with little volume or very recent news are higher uncertainty
 
 CRITICAL — Economic indicator markets (CPI, Fed rate, unemployment, GDP, PCE, S&P 500):
-- When FRED data is present in the research, treat it as ground truth. The most recent reading IS the current value.
-- These markets ask "will X be above/below Y threshold?" — compare the FRED value directly to the threshold in the market title.
-- A market asking "Will CPI exceed 0.3% MoM?" when FRED shows the latest reading IS 0.2% should be estimated near 0%, not 50%.
-- Do NOT speculate away from the FRED data. Trust the number. Only deviate if there is strong evidence of a revision or the measurement period has not yet occurred.
-- The trend (↑ accelerating / ↓ decelerating) is directional context, not a guarantee. Weight recent data more than the trend.
+When FRED data is present, follow this two-step logic:
+
+STEP A — Does the FRED data cover the SAME period the market is asking about?
+  - Check the "latest data:" date in the FRED header and compare to the period in the market title.
+  - Example: market asks "Will CPI exceed 0.4% in April 2026?" and FRED shows "latest data: 2026-04-01" → YES, this is the April reading. Treat it as the answer.
+  - Example: market asks "Will GDP grow >1% in Q2 2026?" and FRED shows "latest data: Q1 2026" → NO, Q2 data is not yet available.
+
+STEP B — Apply the appropriate reasoning:
+  - If FRED data IS for the measurement period: treat the value as ground truth and compare directly to the threshold. If FRED shows 0.865% and the threshold is 0.5%, the answer is YES (probability ~97-99%). If the threshold is 0.9%, the answer is NO (probability ~2-4%).
+  - If FRED data is from a PRIOR period (Q2 asked but only Q1 available): use the data as a strong prior, not the answer. Q1 GDP of 2.0% suggests Q2 will likely also be positive, but there's genuine uncertainty. Do NOT flip the probability 180° based on prior-period data.
+
+Additional rules:
+- The trend (↑ accelerating / ↓ decelerating) provides directional bias but not certainty.
+- Market consensus is often well-calibrated for future-period economic questions; don't diverge >15pp without strong evidence.
 
 Always respond with valid JSON only — no markdown, no extra text.`;
 

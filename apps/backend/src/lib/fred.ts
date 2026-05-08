@@ -79,7 +79,16 @@ export async function fetchFredData(ticker: string): Promise<string | null> {
 
     // Show last 6 readings
     const recent = observations.slice(0, 6);
-    const lines = recent.map((o) => `  ${o.date}: ${o.value}${series.unit}`).join('\n');
+    const formatDate = (d: string) => {
+      if (series.frequency === 'quarterly') {
+        const month = parseInt(d.slice(5, 7));
+        const year = d.slice(0, 4);
+        const q = Math.ceil(month / 3);
+        return `Q${q} ${year}`;
+      }
+      return d;
+    };
+    const lines = recent.map((o) => `  ${formatDate(o.date)}: ${o.value}${series.unit}`).join('\n');
 
     // Compute recent average for context
     const nums = recent.map((o) => parseFloat(o.value)).filter((n) => !isNaN(n));
@@ -92,8 +101,9 @@ export async function fetchFredData(ticker: string): Promise<string | null> {
       ? nums[0] > nums[1] ? '↑ accelerating' : nums[0] < nums[1] ? '↓ decelerating' : '→ flat'
       : '';
 
+    const latestDate = formatDate(observations[0].date);
     const lines2 = [
-      `=== FRED: ${series.label} (${series.id}) ===`,
+      `=== FRED: ${series.label} (${series.id}) — latest data: ${latestDate} ===`,
       `Recent readings (newest first):`,
       lines,
       avg ? `Recent average: ${avg}${series.unit}  ${trend}` : '',
