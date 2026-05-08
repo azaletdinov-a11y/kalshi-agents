@@ -1,6 +1,15 @@
 'use client';
 
 import { useState } from 'react';
+
+// Mirrors Kalshi's payout: contracts rounded down to 2dp, 7% fee on profit
+function kalshiPnl(amount: number, fillPrice: number): number {
+  if (amount <= 0 || fillPrice <= 0 || fillPrice >= 100) return 0;
+  const contracts = Math.floor((amount / (fillPrice / 100)) * 100) / 100;
+  const grossProfit = contracts - amount;
+  const fee = Math.max(0, grossProfit) * 0.07;
+  return Math.round((grossProfit - fee) * 100) / 100;
+}
 import { useRouter } from 'next/navigation';
 import type { Recommendation, Bet } from '@kalshi/shared';
 
@@ -79,10 +88,7 @@ export function RecordBetButton({
   }
 
   const fillLabel = rec.side === 'yes' ? 'YES price (¢)' : 'NO price (¢)';
-  const expectedPnl =
-    parseFloat(amount) > 0 && parseFloat(fillPrice) > 0
-      ? (parseFloat(amount) * (100 - parseFloat(fillPrice))) / parseFloat(fillPrice)
-      : 0;
+  const expectedPnl = kalshiPnl(parseFloat(amount), parseFloat(fillPrice));
 
   return (
     <>

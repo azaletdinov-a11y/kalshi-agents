@@ -39,8 +39,11 @@ export async function resolveSettledMarkets(): Promise<number> {
         const betOutcome = result === bet.side ? 'won' : 'lost';
         const amount = Number(bet.amount);
         const fillPrice = Number(bet.fill_price);
+        // Kalshi payout: round contracts down to 2dp, deduct 7% fee on profit
+        const contracts = Math.floor((amount / (fillPrice / 100)) * 100) / 100;
+        const grossProfit = contracts - amount;
         const pnl = betOutcome === 'won'
-          ? Math.round((amount * (100 - fillPrice) / fillPrice) * 100) / 100
+          ? Math.round((grossProfit - Math.max(0, grossProfit) * 0.07) * 100) / 100
           : -amount;
         await db.query(
           `UPDATE bets SET outcome=$1, pnl=$2, resolved_at=NOW() WHERE id=$3`,

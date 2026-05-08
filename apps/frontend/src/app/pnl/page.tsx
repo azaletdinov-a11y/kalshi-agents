@@ -2,6 +2,14 @@ import { getBets, getPnlSummary } from '@/lib/api';
 
 export const dynamic = 'force-dynamic';
 
+function kalshiPnl(amount: number, fillPrice: number): number {
+  if (amount <= 0 || fillPrice <= 0 || fillPrice >= 100) return 0;
+  const contracts = Math.floor((amount / (fillPrice / 100)) * 100) / 100;
+  const grossProfit = contracts - amount;
+  const fee = Math.max(0, grossProfit) * 0.07;
+  return Math.round((grossProfit - fee) * 100) / 100;
+}
+
 export default async function PnlPage() {
   const [summary, bets] = await Promise.all([
     getPnlSummary().catch(() => null),
@@ -65,7 +73,7 @@ export default async function PnlPage() {
             </thead>
             <tbody>
               {activeBets.map((b) => {
-                const expectedWin = Math.round((b.amount * (100 - b.fill_price) / b.fill_price) * 100) / 100;
+                const expectedWin = kalshiPnl(b.amount, b.fill_price);
                 const pnlColor =
                   b.outcome === 'won' ? 'text-emerald-400'
                   : b.outcome === 'lost' ? 'text-red-400'
