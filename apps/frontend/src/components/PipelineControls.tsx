@@ -21,6 +21,7 @@ const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 export function PipelineControls() {
   const [status, setStatus] = useState<Status | null>(null);
   const [triggering, setTriggering] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const wasRunning = useRef(false);
   const router = useRouter();
 
@@ -58,6 +59,19 @@ export function PipelineControls() {
     }
   }
 
+  async function handleReset() {
+    if (!confirm('Cancel all pending recommendations and re-evaluate from scratch?')) return;
+    setResetting(true);
+    try {
+      const res = await fetch(`${BASE}/api/pipeline/reset`, { method: 'POST' });
+      const data = await res.json();
+      alert(`Cancelled ${data.cancelled} pending recs. Run the pipeline to regenerate.`);
+      router.refresh();
+    } catch { /* ignore */ } finally {
+      setResetting(false);
+    }
+  }
+
   const isRunning = status?.is_running ?? false;
   const lastRun = status?.runs?.[0];
 
@@ -81,6 +95,13 @@ export function PipelineControls() {
           {lastRun.recommendations_generated} recs generated
         </span>
       )}
+      <button
+        onClick={handleReset}
+        disabled={isRunning || resetting}
+        className="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed text-slate-300 text-sm font-medium transition-colors"
+      >
+        {resetting ? 'Resetting…' : 'Reset Recs'}
+      </button>
       <button
         onClick={handleRun}
         disabled={isRunning || triggering}

@@ -46,4 +46,13 @@ router.post('/run', async (_req, res) => {
   res.json({ message: 'Pipeline started' });
 });
 
+router.post('/reset', async (_req, res) => {
+  const result = await db.query(
+    `UPDATE recommendations SET outcome='cancelled' WHERE outcome='pending' RETURNING market_ticker`
+  );
+  const tickers = result.rows.map((r: { market_ticker: string }) => r.market_ticker);
+  console.log(`[Pipeline] Reset: cancelled ${tickers.length} pending recs`);
+  res.json({ cancelled: tickers.length, tickers });
+});
+
 export default router;
