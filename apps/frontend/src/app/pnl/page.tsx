@@ -1,4 +1,5 @@
 import { getBets, getPnlSummary } from '@/lib/api';
+import { EditBetButton } from '@/components/EditBetButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -69,6 +70,7 @@ export default async function PnlPage() {
                 <th className="px-4 py-3 font-medium text-center">Status</th>
                 <th className="px-4 py-3 font-medium text-right">P&amp;L</th>
                 <th className="px-4 py-3 font-medium text-right">Placed</th>
+                <th className="px-4 py-3 font-medium" />
               </tr>
             </thead>
             <tbody>
@@ -102,6 +104,9 @@ export default async function PnlPage() {
                     </td>
                     <td className="px-4 py-3 text-right text-slate-500 text-xs">
                       {new Date(b.placed_at).toLocaleDateString()}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <EditBetButton bet={b} />
                     </td>
                   </tr>
                 );

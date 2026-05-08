@@ -78,6 +78,24 @@ router.post('/', async (req, res) => {
   res.json(normalizeBet(result.rows[0]));
 });
 
+router.patch('/:id', async (req, res) => {
+  const { fill_price, amount } = req.body;
+  if (fill_price == null && amount == null) {
+    return res.status(400).json({ error: 'fill_price or amount required' });
+  }
+  const fields: string[] = [];
+  const vals: unknown[] = [];
+  if (amount != null) { fields.push(`amount=$${fields.length + 1}`); vals.push(amount); }
+  if (fill_price != null) { fields.push(`fill_price=$${fields.length + 1}`); vals.push(fill_price); }
+  vals.push(req.params.id);
+  const result = await db.query(
+    `UPDATE bets SET ${fields.join(',')} WHERE id=$${vals.length} AND outcome='pending' RETURNING *`,
+    vals
+  );
+  if (result.rows.length === 0) return res.status(404).json({ error: 'Bet not found or already resolved' });
+  res.json(normalizeBet(result.rows[0]));
+});
+
 router.delete('/:id', async (req, res) => {
   await db.query(`UPDATE bets SET outcome='cancelled' WHERE id=$1`, [req.params.id]);
   res.json({ ok: true });
