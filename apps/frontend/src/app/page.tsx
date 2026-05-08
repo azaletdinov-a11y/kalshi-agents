@@ -1,4 +1,4 @@
-import { getStats, getRecommendations, getBets, getBetsClosingSoon } from '@/lib/api';
+import { getStats, getRecommendations, getBets, getBetsClosingSoon, getEvSummary } from '@/lib/api';
 import { RecommendationCard } from '@/components/RecommendationCard';
 import { PipelineControls } from '@/components/PipelineControls';
 import type { Bet } from '@kalshi/shared';
@@ -6,11 +6,12 @@ import type { Bet } from '@kalshi/shared';
 export const dynamic = 'force-dynamic';
 
 export default async function DashboardPage() {
-  const [stats, recs, allBets, closingSoon] = await Promise.all([
+  const [stats, recs, allBets, closingSoon, ev] = await Promise.all([
     getStats().catch((e) => { console.error('[Dashboard] stats error:', e.message); return null; }),
     getRecommendations('pending').catch((e) => { console.error('[Dashboard] recs error:', e.message); return []; }),
     getBets().catch(() => [] as Bet[]),
     getBetsClosingSoon().catch(() => [] as Bet[]),
+    getEvSummary().catch(() => null),
   ]);
 
   const top = recs.slice(0, 6);
@@ -42,6 +43,23 @@ export default async function DashboardPage() {
           value={stats?.total_resolved ?? '—'}
         />
       </div>
+
+      {ev && (
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <StatCard
+            label="Expected Value (open bets)"
+            value={ev.total_ev > 0 ? `+$${ev.total_ev.toFixed(2)}` : `$${ev.total_ev.toFixed(2)}`}
+          />
+          <StatCard
+            label="Total Exposure"
+            value={`$${ev.total_exposure.toFixed(2)}`}
+          />
+          <StatCard
+            label="Open Positions"
+            value={ev.pending_count}
+          />
+        </div>
+      )}
 
       {closingSoon.length > 0 && (
         <div>

@@ -46,6 +46,29 @@ router.get('/summary', async (_req, res) => {
   });
 });
 
+router.get('/by-category', async (_req, res) => {
+  const result = await db.query(`
+    SELECT
+      r.category,
+      COUNT(b.id) FILTER (WHERE b.outcome != 'cancelled') AS total_bets,
+      COALESCE(SUM(b.amount) FILTER (WHERE b.outcome != 'cancelled'), 0) AS total_wagered,
+      COALESCE(SUM(b.pnl) FILTER (WHERE b.outcome IN ('won','lost')), 0) AS total_pnl,
+      COUNT(b.id) FILTER (WHERE b.outcome = 'won') AS wins,
+      COUNT(b.id) FILTER (WHERE b.outcome IN ('won','lost')) AS resolved
+    FROM bets b
+    JOIN recommendations r ON r.id = b.recommendation_id
+    GROUP BY r.category
+    ORDER BY total_wagered DESC
+  `);
+  res.json(result.rows.map((r) => ({
+    category: r.category ?? 'Other',
+    total_bets: Number(r.total_bets),
+    total_wagered: Number(r.total_wagered),
+    total_pnl: Number(r.total_pnl),
+    win_rate: Number(r.resolved) > 0 ? Math.round((Number(r.wins) / Number(r.resolved)) * 100) : null,
+  })));
+});
+
 router.get('/closing-soon', async (_req, res) => {
   const result = await db.query(`
     SELECT * FROM bets

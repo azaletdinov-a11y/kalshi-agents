@@ -1,6 +1,8 @@
-import { getBets, getPnlSummary } from '@/lib/api';
+import { getBets, getPnlSummary, getBetsByCategory, getCalibration, getBankroll } from '@/lib/api';
 import { EditBetButton } from '@/components/EditBetButton';
 import { DeleteBetButton } from '@/components/DeleteBetButton';
+import { CalibrationChart } from '@/components/CalibrationChart';
+import { BankrollEditor } from '@/components/BankrollEditor';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,9 +15,12 @@ function kalshiPnl(amount: number, fillPrice: number): number {
 }
 
 export default async function PnlPage() {
-  const [summary, bets] = await Promise.all([
+  const [summary, bets, byCategory, calibration, bankroll] = await Promise.all([
     getPnlSummary().catch(() => null),
     getBets().catch(() => []),
+    getBetsByCategory().catch(() => []),
+    getCalibration().catch(() => []),
+    getBankroll().catch(() => null),
   ]);
 
   const activeBets = bets.filter((b) => b.outcome !== 'cancelled');
@@ -24,7 +29,9 @@ export default async function PnlPage() {
     <div className="space-y-8">
       <h1 className="text-2xl font-bold">P&amp;L</h1>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid md:grid-cols-4 gap-4">
+        {bankroll && <BankrollEditor bankroll={bankroll} />}
+        <div className="md:col-span-3 grid grid-cols-2 md:grid-cols-3 gap-4">
         <StatCard
           label="Total Wagered"
           value={summary ? `$${summary.total_wagered.toFixed(2)}` : '—'}
@@ -43,7 +50,44 @@ export default async function PnlPage() {
           value={summary?.roi != null ? `${summary.roi > 0 ? '+' : ''}${summary.roi}%` : '—'}
           color={summary?.roi != null ? (summary.roi >= 0 ? 'emerald' : 'red') : undefined}
         />
+        </div>
       </div>
+
+      {byCategory.length > 0 && (
+        <div>
+          <h2 className="text-base font-semibold mb-3">By Category</h2>
+          <div className="rounded-xl border border-slate-800 bg-slate-900 overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-800 text-left text-xs text-slate-500">
+                  <th className="px-4 py-3 font-medium">Category</th>
+                  <th className="px-4 py-3 font-medium text-right">Bets</th>
+                  <th className="px-4 py-3 font-medium text-right">Wagered</th>
+                  <th className="px-4 py-3 font-medium text-right">P&amp;L</th>
+                  <th className="px-4 py-3 font-medium text-right">Win Rate</th>
+                </tr>
+              </thead>
+              <tbody>
+                {byCategory.map((cat) => (
+                  <tr key={cat.category} className="border-b border-slate-800/50">
+                    <td className="px-4 py-3 text-slate-200">{cat.category}</td>
+                    <td className="px-4 py-3 text-right text-slate-400">{cat.total_bets}</td>
+                    <td className="px-4 py-3 text-right text-slate-400">${cat.total_wagered.toFixed(2)}</td>
+                    <td className={`px-4 py-3 text-right font-semibold ${cat.total_pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {formatPnl(cat.total_pnl)}
+                    </td>
+                    <td className="px-4 py-3 text-right text-slate-400">
+                      {cat.win_rate != null ? `${cat.win_rate}%` : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      <CalibrationChart data={calibration} />
 
       <div className="grid grid-cols-3 gap-4">
         <MiniStat label="Total Bets" value={summary?.total_bets ?? '—'} />

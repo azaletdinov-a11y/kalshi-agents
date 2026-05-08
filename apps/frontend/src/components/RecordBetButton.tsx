@@ -1,8 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import type { Recommendation, Bet } from '@kalshi/shared';
 
-// Mirrors Kalshi's payout: contracts rounded down to 2dp, 7% fee on profit
+const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+
 function kalshiPnl(amount: number, fillPrice: number): number {
   if (amount <= 0 || fillPrice <= 0 || fillPrice >= 100) return 0;
   const contracts = Math.floor((amount / (fillPrice / 100)) * 100) / 100;
@@ -10,10 +13,6 @@ function kalshiPnl(amount: number, fillPrice: number): number {
   const fee = Math.max(0, grossProfit) * 0.07;
   return Math.round((grossProfit - fee) * 100) / 100;
 }
-import { useRouter } from 'next/navigation';
-import type { Recommendation, Bet } from '@kalshi/shared';
-
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
 export function RecordBetButton({
   rec,
@@ -30,7 +29,23 @@ export function RecordBetButton({
       : (100 - rec.market_yes_price).toString()
   );
   const [saving, setSaving] = useState(false);
+  const [fetchingPrice, setFetchingPrice] = useState(false);
   const router = useRouter();
+
+  async function openModal() {
+    setOpen(true);
+    setFetchingPrice(true);
+    try {
+      const res = await fetch(`${BASE}/api/markets/${rec.market_ticker}/price`);
+      if (res.ok) {
+        const prices = await res.json();
+        const live = rec.side === 'yes' ? prices.yes_ask : prices.no_ask;
+        if (live > 0) setFillPrice(live.toString());
+      }
+    } catch { /* use default */ } finally {
+      setFetchingPrice(false);
+    }
+  }
 
   if (existingBet && existingBet.outcome !== 'cancelled') {
     const pnl = existingBet.pnl;
@@ -93,7 +108,7 @@ export function RecordBetButton({
   return (
     <>
       <button
-        onClick={() => setOpen(true)}
+        onClick={openModal}
         className="text-xs text-emerald-400 hover:text-emerald-300 transition-colors font-medium"
       >
         + Record Bet
@@ -132,6 +147,7 @@ export function RecordBetButton({
               <div>
                 <label className="block text-xs text-slate-400 mb-1">
                   {fillLabel} — actual fill price (0–99)
+                  {fetchingPrice && <span className="ml-2 text-slate-500">fetching live…</span>}
                 </label>
                 <input
                   type="number"

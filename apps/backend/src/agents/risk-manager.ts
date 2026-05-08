@@ -4,7 +4,6 @@ import { EstimationResult } from './estimator';
 import { ResearchResult } from './researcher';
 import { db } from '../db/client';
 
-const BANKROLL = Number(process.env.BANKROLL ?? 100);
 const MAX_BET = Number(process.env.MAX_BET ?? 5);
 const MIN_EDGE = Number(process.env.MIN_EDGE ?? 0.05);
 const KELLY_FRACTION = Number(process.env.KELLY_FRACTION ?? 0.25);
@@ -21,6 +20,14 @@ export async function evaluateAndStore(
   estimation: EstimationResult,
   research: ResearchResult
 ): Promise<boolean> {
+  // Fetch live bankroll: starting bankroll + realized P&L from actual bets
+  const [bankrollSetting, realizedPnl] = await Promise.all([
+    db.query(`SELECT value FROM settings WHERE key='starting_bankroll'`),
+    db.query(`SELECT COALESCE(SUM(pnl), 0) AS pnl FROM bets WHERE outcome IN ('won','lost')`),
+  ]);
+  const startingBankroll = Number(bankrollSetting.rows[0]?.value ?? process.env.BANKROLL ?? 100);
+  const BANKROLL = Math.max(10, startingBankroll + Number(realizedPnl.rows[0].pnl));
+
   const marketP = estimation.marketYesPrice / 100;
   const ourP = estimation.estimated_probability / 100;
 

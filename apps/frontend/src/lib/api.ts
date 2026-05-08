@@ -99,3 +99,60 @@ export async function recordBet(
 export async function cancelBet(id: number): Promise<void> {
   await fetch(`${BASE}/api/bets/${id}`, { method: 'DELETE' });
 }
+
+export interface CategoryPnl {
+  category: string;
+  total_bets: number;
+  total_wagered: number;
+  total_pnl: number;
+  win_rate: number | null;
+}
+
+export async function getBetsByCategory(): Promise<CategoryPnl[]> {
+  return get('/api/bets/by-category');
+}
+
+export interface CalibrationBucket {
+  bucket: number;
+  label: string;
+  total: number;
+  wins: number;
+  win_rate: number | null;
+  avg_estimate: number;
+}
+
+export async function getCalibration(): Promise<CalibrationBucket[]> {
+  return get('/api/recommendations/calibration');
+}
+
+export interface EvSummary {
+  total_ev: number;
+  total_exposure: number;
+  pending_count: number;
+}
+
+export async function getEvSummary(): Promise<EvSummary> {
+  return get('/api/recommendations/ev-summary');
+}
+
+export interface BankrollInfo {
+  starting_bankroll: number;
+  realized_pnl: number;
+  current_bankroll: number;
+}
+
+export async function getBankroll(): Promise<BankrollInfo> {
+  return get('/api/settings/bankroll');
+}
+
+export async function setBankroll(amount: number): Promise<void> {
+  await fetch(`${BASE}/api/settings/bankroll`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ amount }),
+  });
+}
+
+export async function getMarketPrice(ticker: string): Promise<{ yes_ask: number; yes_bid: number; no_ask: number; no_bid: number }> {
+  return get(`/api/markets/${ticker}/price`);
+}

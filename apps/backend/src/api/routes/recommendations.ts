@@ -3,6 +3,46 @@ import { db } from '../../db/client';
 
 const router = Router();
 
+router.get('/calibration', async (_req, res) => {
+  const result = await db.query(`
+    SELECT
+      width_bucket(estimated_probability, 0, 100, 10) AS bucket,
+      COUNT(*) AS total,
+      COUNT(*) FILTER (WHERE outcome = 'won') AS wins,
+      AVG(estimated_probability) AS avg_estimate
+    FROM recommendations
+    WHERE outcome IN ('won', 'lost')
+    GROUP BY bucket
+    ORDER BY bucket
+  `);
+  const data = result.rows.map((r) => ({
+    bucket: (Number(r.bucket) - 1) * 10,
+    label: `${(Number(r.bucket) - 1) * 10}–${Number(r.bucket) * 10}%`,
+    total: Number(r.total),
+    wins: Number(r.wins),
+    win_rate: Number(r.total) > 0 ? Math.round((Number(r.wins) / Number(r.total)) * 100) : null,
+    avg_estimate: Math.round(Number(r.avg_estimate)),
+  }));
+  res.json(data);
+});
+
+router.get('/ev-summary', async (_req, res) => {
+  const result = await db.query(`
+    SELECT
+      COALESCE(SUM(edge * recommended_bet / 100), 0) AS total_ev,
+      COALESCE(SUM(recommended_bet), 0) AS total_exposure,
+      COUNT(*) AS pending_count
+    FROM recommendations
+    WHERE outcome = 'pending'
+  `);
+  const row = result.rows[0];
+  res.json({
+    total_ev: Math.round(Number(row.total_ev) * 100) / 100,
+    total_exposure: Math.round(Number(row.total_exposure) * 100) / 100,
+    pending_count: Number(row.pending_count),
+  });
+});
+
 router.get('/', async (req, res) => {
   const { outcome = 'pending', limit = '50', offset = '0' } = req.query;
   const result = await db.query(
