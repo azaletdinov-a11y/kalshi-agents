@@ -60,5 +60,46 @@ export async function resolveSettledMarkets(): Promise<number> {
     console.log(`[Resolver] Resolved ${resolved} recommendation(s)`);
   }
 
+  // Also resolve Kalshi-synced bets that have no linked recommendation
+  const orphanBets = await db.query(`
+    SELECT DISTINCT market_ticker FROM bets
+    WHERE outcome = 'pending' AND recommendation_id IS NULL
+  `);
+
+  for (const row of orphanBets.rows) {
+    try {
+      const market = await getMarket(row.market_ticker as string);
+      const isSettled =
+        market.status === 'finalized' ||
+        market.status === 'settled' ||
+        (typeof market.result === 'string' && market.result !== '');
+
+      if (!isSettled) continue;
+
+      const result = market.result?.toLowerCase();
+      const bets = await db.query(
+        `SELECT id, amount, fill_price, side FROM bets WHERE market_ticker=$1 AND outcome='pending' AND recommendation_id IS NULL`,
+        [row.market_ticker]
+      );
+      for (const bet of bets.rows) {
+        const betOutcome = result === bet.side ? 'won' : 'lost';
+        const amount = Number(bet.amount);
+        const fillPrice = Number(bet.fill_price);
+        const contracts = Math.floor((amount / (fillPrice / 100)) * 100) / 100;
+        const grossProfit = contracts - amount;
+        const pnl = betOutcome === 'won'
+          ? Math.round((grossProfit - Math.max(0, grossProfit) * 0.07) * 100) / 100
+          : -amount;
+        await db.query(
+          `UPDATE bets SET outcome=$1, pnl=$2, resolved_at=NOW() WHERE id=$3`,
+          [betOutcome, pnl, bet.id]
+        );
+        console.log(`[Resolver] Synced bet #${bet.id} ${row.market_ticker}: ${betOutcome.toUpperCase()} pnl=${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}`);
+      }
+    } catch {
+      // skip
+    }
+  }
+
   return resolved;
 }

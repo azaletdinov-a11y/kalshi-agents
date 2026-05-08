@@ -126,6 +126,37 @@ export async function getMarket(ticker: string): Promise<KalshiMarketResolved> {
   return data.market;
 }
 
+export interface KalshiFill {
+  fill_id: string;
+  trade_id: string;
+  ticker: string;
+  side: 'yes' | 'no';
+  action: 'buy' | 'sell';
+  count: number;
+  yes_price: number;
+  no_price: number;
+  created_time: string;
+}
+
+export async function getMyFills(maxFills = 2000): Promise<KalshiFill[]> {
+  const fills: KalshiFill[] = [];
+  let cursor: string | undefined;
+
+  do {
+    const params: Record<string, string | number> = { limit: Math.min(100, maxFills - fills.length) };
+    if (cursor) params.cursor = cursor;
+    if (fills.length > 0) await sleep(400);
+
+    const data = await apiGet<{ fills: KalshiFill[]; cursor?: string }>('/portfolio/fills', params);
+    fills.push(...(data.fills ?? []));
+    cursor = data.cursor;
+
+    if (!cursor || fills.length >= maxFills) break;
+  } while (true);
+
+  return fills;
+}
+
 export async function getMarketsBySeriesTicker(seriesTicker: string): Promise<KalshiMarketRaw[]> {
   try {
     const data = await apiGet<{ markets: KalshiMarketRaw[] }>('/markets', {

@@ -3,6 +3,7 @@ import { EditBetButton } from '@/components/EditBetButton';
 import { DeleteBetButton } from '@/components/DeleteBetButton';
 import { CalibrationChart } from '@/components/CalibrationChart';
 import { BankrollEditor } from '@/components/BankrollEditor';
+import { SyncKalshiButton } from '@/components/SyncKalshiButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,7 +28,10 @@ export default async function PnlPage() {
 
   return (
     <div className="space-y-8">
-      <h1 className="text-2xl font-bold">P&amp;L</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">P&amp;L</h1>
+        <SyncKalshiButton />
+      </div>
 
       <div className="grid md:grid-cols-4 gap-4">
         {bankroll && <BankrollEditor bankroll={bankroll} />}

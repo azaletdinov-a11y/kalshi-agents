@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { db } from '../../db/client';
+import { getMyFills, getMarket } from '../../lib/kalshi';
 
 const router = Router();
 
@@ -49,14 +50,14 @@ router.get('/summary', async (_req, res) => {
 router.get('/by-category', async (_req, res) => {
   const result = await db.query(`
     SELECT
-      r.category,
+      COALESCE(r.category, 'Other') AS category,
       COUNT(b.id) FILTER (WHERE b.outcome != 'cancelled') AS total_bets,
       COALESCE(SUM(b.amount) FILTER (WHERE b.outcome != 'cancelled'), 0) AS total_wagered,
       COALESCE(SUM(b.pnl) FILTER (WHERE b.outcome IN ('won','lost')), 0) AS total_pnl,
       COUNT(b.id) FILTER (WHERE b.outcome = 'won') AS wins,
       COUNT(b.id) FILTER (WHERE b.outcome IN ('won','lost')) AS resolved
     FROM bets b
-    JOIN recommendations r ON r.id = b.recommendation_id
+    LEFT JOIN recommendations r ON r.id = b.recommendation_id
     GROUP BY r.category
     ORDER BY total_wagered DESC
   `);
@@ -117,6 +118,62 @@ router.patch('/:id', async (req, res) => {
   );
   if (result.rows.length === 0) return res.status(404).json({ error: 'Bet not found or already resolved' });
   res.json(normalizeBet(result.rows[0]));
+});
+
+router.post('/sync-kalshi', async (_req, res) => {
+  const fills = await getMyFills();
+  const buys = fills.filter((f) => f.action === 'buy');
+
+  let imported = 0;
+  let skipped = 0;
+  const errors: string[] = [];
+
+  for (const fill of buys) {
+    try {
+      const exists = await db.query('SELECT id FROM bets WHERE kalshi_fill_id=$1', [fill.fill_id]);
+      if (exists.rows.length > 0) { skipped++; continue; }
+
+      const fillPrice = fill.side === 'yes' ? fill.yes_price : fill.no_price;
+      const amount = Math.round(fill.count * (fillPrice / 100) * 100) / 100;
+
+      // Try to match a recommendation for this ticker
+      const rec = await db.query(
+        `SELECT id, market_title, close_time FROM recommendations WHERE market_ticker=$1 ORDER BY created_at DESC LIMIT 1`,
+        [fill.ticker]
+      );
+
+      let market_title: string = fill.ticker;
+      let close_time: string | null = null;
+      let recommendation_id: number | null = null;
+
+      if (rec.rows.length > 0) {
+        market_title = rec.rows[0].market_title as string;
+        close_time = rec.rows[0].close_time as string;
+        recommendation_id = rec.rows[0].id as number;
+      } else {
+        try {
+          const market = await getMarket(fill.ticker);
+          market_title = market.title;
+          close_time = market.close_time;
+        } catch {
+          // leave title as ticker, close_time null
+        }
+      }
+
+      await db.query(
+        `INSERT INTO bets (kalshi_fill_id, recommendation_id, market_ticker, market_title, side, fill_price, amount, close_time, placed_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        [fill.fill_id, recommendation_id, fill.ticker, market_title, fill.side, fillPrice, amount, close_time, fill.created_time]
+      );
+      imported++;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      errors.push(`${fill.ticker}: ${msg}`);
+    }
+  }
+
+  console.log(`[Bets] Kalshi sync: ${imported} imported, ${skipped} already existed`);
+  res.json({ imported, skipped, total_fills: buys.length, errors });
 });
 
 router.delete('/:id', async (req, res) => {

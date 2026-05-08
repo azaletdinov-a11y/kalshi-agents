@@ -156,3 +156,9 @@ export async function setBankroll(amount: number): Promise<void> {
 export async function getMarketPrice(ticker: string): Promise<{ yes_ask: number; yes_bid: number; no_ask: number; no_bid: number }> {
   return get(`/api/markets/${ticker}/price`);
 }
+
+export async function syncKalshiBets(): Promise<{ imported: number; skipped: number; total_fills: number; errors: string[] }> {
+  const res = await fetch(`${BASE}/api/bets/sync-kalshi`, { method: 'POST' });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}

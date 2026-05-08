@@ -91,6 +91,7 @@ CREATE TABLE IF NOT EXISTS settings (
   value TEXT NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+ALTER TABLE bets ADD COLUMN IF NOT EXISTS kalshi_fill_id TEXT UNIQUE;
 `;
 
 async function start() {
