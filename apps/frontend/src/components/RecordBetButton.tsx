@@ -147,7 +147,8 @@ export function RecordBetButton({
 
               {expectedPnl > 0 && (
                 <div className="rounded-lg bg-slate-800 px-3 py-2 text-xs text-slate-400">
-                  If wins: <span className="text-emerald-400 font-semibold">+${expectedPnl.toFixed(2)}</span>
+                  If wins: <span className="text-emerald-400 font-semibold">${(parseFloat(amount) + expectedPnl).toFixed(2)} total</span>
+                  <span className="text-slate-500 ml-1">(+${expectedPnl.toFixed(2)} profit)</span>
                   {'  '}·{'  '}
                   If loses: <span className="text-red-400 font-semibold">-${parseFloat(amount).toFixed(2)}</span>
                 </div>
