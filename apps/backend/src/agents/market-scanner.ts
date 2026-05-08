@@ -24,6 +24,10 @@ export async function scanMarkets(): Promise<KalshiMarketRaw[]> {
   console.log('[Scanner] Fetching open markets from Kalshi...');
   const all = await getOpenMarkets(1000);
 
+  // Log all unique categories from the API so we can tune the allowlist
+  const allCategories = [...new Set(all.map((m) => m.category ?? 'undefined'))].sort();
+  console.log(`[Scanner] All categories in API: ${JSON.stringify(allCategories)}`);
+
   const now = Date.now();
   const filtered = all.filter((m) => {
     if (!m.close_time) return false;
@@ -34,12 +38,9 @@ export async function scanMarkets(): Promise<KalshiMarketRaw[]> {
     const yesAsk = parsePrice(m.yes_ask_dollars) || (100 - parsePrice(m.no_bid_dollars));
     const hasLiquidity = parseFloat(m.yes_ask_dollars ?? '0') > 0 || parseFloat(m.no_bid_dollars ?? '0') > 0;
 
-    const category = m.category ?? '';
-    const isGoodCategory = ALLOWED_CATEGORIES.has(category);
     const isBlockedTicker = BLOCKED_PREFIXES.some((p) => m.ticker.startsWith(p));
 
     return (
-      isGoodCategory &&
       !isBlockedTicker &&
       volume >= MIN_VOLUME &&
       daysToClose >= MIN_DAYS_TO_CLOSE &&
