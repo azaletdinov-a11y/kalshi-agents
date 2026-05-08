@@ -10,9 +10,15 @@ export function DeleteBetButton({ id }: { id: number }) {
   const router = useRouter();
 
   async function handleDelete() {
-    await fetch(`${BASE}/api/bets/${id}`, { method: 'DELETE' });
-    setConfirming(false);
-    router.refresh();
+    try {
+      const res = await fetch(`${BASE}/api/bets/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(`${res.status}`);
+      setConfirming(false);
+      router.refresh();
+    } catch (e) {
+      alert(`Delete failed: ${e}`);
+      setConfirming(false);
+    }
   }
 
   if (confirming) {
