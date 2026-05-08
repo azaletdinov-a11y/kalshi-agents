@@ -112,8 +112,30 @@ export async function fetchFredData(ticker: string): Promise<string | null> {
       : '';
 
     const latestDate = formatDate(observations[0].date);
+    const latestRawDate = observations[0].date; // YYYY-MM-DD
+
+    // Detect if this is prior-period data (monthly series only)
+    // Monthly FRED data lags 1-2 months; warn Claude not to treat it as predictive
+    let priorPeriodWarning = '';
+    if (series.frequency === 'monthly') {
+      const now = new Date();
+      const latestYear = parseInt(latestRawDate.slice(0, 4));
+      const latestMonth = parseInt(latestRawDate.slice(5, 7));
+      const isCurrentMonth = latestYear === now.getFullYear() && latestMonth === now.getMonth() + 1;
+      if (!isCurrentMonth) {
+        priorPeriodWarning = [
+          `⚠️ PRIOR PERIOD WARNING: The data above covers ${latestDate} — it is NOT the measurement period for this market.`,
+          `Monthly readings (CPI, PCE, unemployment) are HIGHLY VARIABLE. A high/low reading one month does NOT predict the next.`,
+          `DO NOT use this reading to argue the future month will also be above/below any threshold.`,
+          `The market price is your primary signal — it reflects actual economist forecasts and survey data for the future period.`,
+          `Anchor your estimate within ~10 percentage points of the market price unless news evidence strongly supports divergence.`,
+        ].join('\n');
+      }
+    }
+
     const lines2 = [
       `=== FRED: ${series.label} (${series.id}) — latest data: ${latestDate} ===`,
+      priorPeriodWarning,
       `Recent readings (newest first):`,
       lines,
       avg ? `Recent average: ${avg}${series.unit}  ${trend}` : '',

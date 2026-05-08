@@ -15,36 +15,10 @@ Key principles:
 - A 2% edge is not worth a trade; look for meaningful mispricings (>5%)
 - Markets with little volume or very recent news are higher uncertainty
 
-CRITICAL — Economic indicator markets (CPI, Fed rate, unemployment, GDP, PCE, S&P 500):
-When FRED data is present, follow this two-step logic:
-
-STEP A — Does the FRED data cover the SAME period the market is asking about?
-  - Check the "latest data:" date in the FRED header and compare to the period in the market title.
-  - Example: market asks "Will CPI exceed 0.4% in April 2026?" and FRED shows "latest data: 2026-04-01" → YES, this IS the April reading. Treat it as the answer.
-  - Example: market asks "Will CPI exceed 0.5% in April 2026?" and FRED shows "latest data: 2026-03-01" → NO, April data not yet available.
-  - Example: market asks "Will GDP grow >1% in Q2 2026?" and FRED shows "latest data: Q1 2026" → NO, Q2 not yet available.
-
-STEP B — Apply the appropriate reasoning based on indicator type:
-
-  If FRED data IS for the exact measurement period:
-  → Treat the value as ground truth. Compare directly to the threshold and give high confidence.
-
-  If FRED data is from a PRIOR period AND the indicator is MONTHLY (CPI, PCE, unemployment):
-  → Monthly readings are HIGHLY VARIABLE month to month. A 0.87% March CPI says very little about April or May.
-  → The market price is FAR MORE RELIABLE than prior-month data — it reflects actual economist forecasts, survey data, and trade flow analysis.
-  → Treat the market price as a strong anchor. Deviate by no more than 10pp unless news evidence strongly supports divergence.
-  → Use FRED only as background context (trend direction), not as a predictor.
-
-  If FRED data is from a PRIOR period AND the indicator is QUARTERLY (GDP):
-  → Quarterly data has more persistence than monthly. Prior quarter provides moderate signal.
-  → Still weight the market price heavily. Deviate no more than 20pp from market without compelling evidence.
-
-  If the indicator is the FED FUNDS RATE:
-  → The rate changes infrequently and only at FOMC meetings. If FRED shows the current rate, it is highly predictive of near-term rate markets.
-
-Additional rules:
-- The trend (↑ accelerating / ↓ decelerating) provides directional bias but not certainty.
-- Never give 95%+ confidence on a prior-period economic market unless the measurement period's data is already published.
+Economic indicator markets (CPI, Fed rate, GDP, PCE, S&P 500):
+- When FRED data includes a ⚠️ PRIOR PERIOD WARNING, follow its instructions exactly — do not override it.
+- When FRED data covers the exact measurement period (no warning), treat the value as ground truth and compare directly to the threshold.
+- For the Fed Funds rate: it changes only at FOMC meetings, so current FRED data is highly predictive of near-term rate markets.
 
 Always respond with valid JSON only — no markdown, no extra text.`;
 
