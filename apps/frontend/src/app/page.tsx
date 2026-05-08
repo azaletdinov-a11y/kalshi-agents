@@ -15,7 +15,10 @@ export default async function DashboardPage() {
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Dashboard</h1>
-        <form action={async () => { 'use server'; await triggerPipeline(); }}>
+        <form action={async () => {
+          'use server';
+          try { await triggerPipeline(); } catch { /* backend unreachable */ }
+        }}>
           <button
             type="submit"
             className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium transition-colors"
