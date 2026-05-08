@@ -1,13 +1,35 @@
 import axios from 'axios';
+import crypto from 'crypto';
 
-// Kalshi REST API v2
-// Auth: API key as Bearer token — adjust if you use RSA-based credentials
-const client = axios.create({
-  baseURL: 'https://trading-api.kalshi.com/trade-api/v2',
-  headers: {
-    Authorization: `Bearer ${process.env.KALSHI_API_KEY}`,
+const BASE_PATH = '/trade-api/v2';
+
+function sign(method: string, path: string): Record<string, string> {
+  const timestamp = Date.now().toString();
+  const message = `${timestamp}${method.toUpperCase()}${path}`;
+
+  const privateKey = (process.env.KALSHI_PRIVATE_KEY ?? '').replace(/\\n/g, '\n');
+
+  const signer = crypto.createSign('RSA-SHA256');
+  signer.update(message);
+  const signature = signer.sign(privateKey, 'base64');
+
+  return {
+    'KALSHI-ACCESS-KEY': process.env.KALSHI_KEY_ID ?? '',
+    'KALSHI-ACCESS-SIGNATURE': signature,
+    'KALSHI-ACCESS-TIMESTAMP': timestamp,
     'Content-Type': 'application/json',
-  },
+  };
+}
+
+const client = axios.create({
+  baseURL: `https://trading-api.kalshi.com${BASE_PATH}`,
+});
+
+client.interceptors.request.use((config) => {
+  const path = `${BASE_PATH}${config.url ?? ''}`;
+  const method = config.method?.toUpperCase() ?? 'GET';
+  Object.assign(config.headers, sign(method, path));
+  return config;
 });
 
 export interface KalshiMarketRaw {
