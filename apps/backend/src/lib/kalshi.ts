@@ -81,13 +81,16 @@ export interface KalshiEvent {
   markets?: KalshiMarketRaw[];
 }
 
-export async function getOpenEvents(): Promise<KalshiEvent[]> {
+export async function getOpenEvents(maxEvents = 1000): Promise<KalshiEvent[]> {
   const events: KalshiEvent[] = [];
   let cursor: string | undefined;
   let page = 0;
 
   do {
-    const params: Record<string, string | number> = { status: 'open', limit: 200 };
+    const params: Record<string, string | number> = {
+      status: 'open',
+      limit: Math.min(200, maxEvents - events.length),
+    };
     if (cursor) params.cursor = cursor;
     if (page > 0) await sleep(800);
     page++;
@@ -98,7 +101,7 @@ export async function getOpenEvents(): Promise<KalshiEvent[]> {
     cursor = data.cursor;
     console.log(`[Kalshi] Events page ${page}: +${batch.length} (total ${events.length})`);
 
-    if (!cursor) break;
+    if (!cursor || events.length >= maxEvents) break;
   } while (true);
 
   return events;

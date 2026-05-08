@@ -40,8 +40,8 @@ export async function scanMarkets(): Promise<KalshiMarketRaw[]> {
 
   const goodEvents = allEvents.filter(
     (e) => !BLOCKED_EVENT_PREFIXES.some((p) => e.event_ticker.startsWith(p))
-  );
-  console.log(`[Scanner] ${allEvents.length} events → ${goodEvents.length} non-sports events`);
+  ).slice(0, 300); // cap to avoid multi-minute market fetching
+  console.log(`[Scanner] ${allEvents.length} events → ${goodEvents.length} selected for market fetch`);
   console.log('[Scanner] Sample events:', goodEvents.slice(0, 5).map((e) => e.event_ticker).join(', '));
 
   const now = Date.now();
