@@ -43,6 +43,7 @@ export interface KalshiMarketRaw {
   close_time: string;
   open_interest_fp?: string;
   liquidity_dollars?: string;
+  mve_collection_ticker?: string; // present on all multi-leg parlay markets
 }
 
 export function parsePrice(dollarStr?: string): number {
