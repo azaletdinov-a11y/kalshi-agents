@@ -1,4 +1,4 @@
-import type { Recommendation, PipelineRun, DashboardStats } from '@kalshi/shared';
+import type { Recommendation, PipelineRun, DashboardStats, Bet, PnlSummary } from '@kalshi/shared';
 
 const BASE =
   process.env.API_URL ??
@@ -56,4 +56,46 @@ export async function markOutcome(
   });
   if (!res.ok) throw new Error(`API error: ${res.status}`);
   return res.json();
+}
+
+function normalizeBet(b: Bet): Bet {
+  return {
+    ...b,
+    fill_price: Number(b.fill_price),
+    amount: Number(b.amount),
+    pnl: b.pnl != null ? Number(b.pnl) : null,
+  };
+}
+
+export async function getBets(outcome?: string): Promise<Bet[]> {
+  const qs = outcome ? `?outcome=${outcome}` : '';
+  const bets = await get<Bet[]>(`/api/bets${qs}`);
+  return bets.map(normalizeBet);
+}
+
+export async function getBetsClosingSoon(): Promise<Bet[]> {
+  const bets = await get<Bet[]>('/api/bets/closing-soon');
+  return bets.map(normalizeBet);
+}
+
+export async function getPnlSummary(): Promise<PnlSummary> {
+  return get('/api/bets/summary');
+}
+
+export async function recordBet(
+  recommendation_id: number,
+  fill_price: number,
+  amount: number
+): Promise<Bet> {
+  const res = await fetch(`${BASE}/api/bets`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ recommendation_id, fill_price, amount }),
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return normalizeBet(await res.json());
+}
+
+export async function cancelBet(id: number): Promise<void> {
+  await fetch(`${BASE}/api/bets/${id}`, { method: 'DELETE' });
 }

@@ -15,6 +15,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <span className="text-lg font-bold text-emerald-400 mb-6">Kalshi Agents</span>
             <a href="/" className="nav-link">Dashboard</a>
             <a href="/recommendations" className="nav-link">Recommendations</a>
+            <a href="/pnl" className="nav-link">P&amp;L</a>
             <a href="/history" className="nav-link">History</a>
           </nav>
           <main className="flex-1 p-8 overflow-auto">{children}</main>

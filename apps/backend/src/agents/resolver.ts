@@ -29,6 +29,25 @@ export async function resolveSettledMarkets(): Promise<number> {
       );
       console.log(`[Resolver] ${rec.market_ticker}: ${outcome.toUpperCase()} (result=${result}, bet=${rec.side})`);
       resolved++;
+
+      // Auto-resolve any bets on this market
+      const bets = await db.query(
+        `SELECT id, amount, fill_price, side FROM bets WHERE market_ticker=$1 AND outcome='pending'`,
+        [rec.market_ticker]
+      );
+      for (const bet of bets.rows) {
+        const betOutcome = result === bet.side ? 'won' : 'lost';
+        const amount = Number(bet.amount);
+        const fillPrice = Number(bet.fill_price);
+        const pnl = betOutcome === 'won'
+          ? Math.round((amount * (100 - fillPrice) / fillPrice) * 100) / 100
+          : -amount;
+        await db.query(
+          `UPDATE bets SET outcome=$1, pnl=$2, resolved_at=NOW() WHERE id=$3`,
+          [betOutcome, pnl, bet.id]
+        );
+        console.log(`[Resolver] Bet #${bet.id} ${rec.market_ticker}: ${betOutcome.toUpperCase()} pnl=${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}`);
+      }
     } catch (err) {
       // Market might not exist anymore or API error — skip silently
     }

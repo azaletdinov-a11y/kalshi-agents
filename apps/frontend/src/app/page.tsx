@@ -1,16 +1,20 @@
-import { getStats, getRecommendations } from '@/lib/api';
+import { getStats, getRecommendations, getBets, getBetsClosingSoon } from '@/lib/api';
 import { RecommendationCard } from '@/components/RecommendationCard';
 import { PipelineControls } from '@/components/PipelineControls';
+import type { Bet } from '@kalshi/shared';
 
 export const dynamic = 'force-dynamic';
 
 export default async function DashboardPage() {
-  const [stats, recs] = await Promise.all([
+  const [stats, recs, allBets, closingSoon] = await Promise.all([
     getStats().catch((e) => { console.error('[Dashboard] stats error:', e.message); return null; }),
     getRecommendations('pending').catch((e) => { console.error('[Dashboard] recs error:', e.message); return []; }),
+    getBets().catch(() => [] as Bet[]),
+    getBetsClosingSoon().catch(() => [] as Bet[]),
   ]);
 
   const top = recs.slice(0, 6);
+  const betsByTicker = Object.fromEntries(allBets.map((b) => [b.market_ticker, b]));
 
   return (
     <div className="space-y-8">
@@ -39,6 +43,20 @@ export default async function DashboardPage() {
         />
       </div>
 
+      {closingSoon.length > 0 && (
+        <div>
+          <h2 className="text-lg font-semibold mb-3">
+            <span className="inline-block w-2 h-2 rounded-full bg-amber-400 animate-pulse mr-2" />
+            Closing Within 24h
+          </h2>
+          <div className="flex flex-col gap-2">
+            {closingSoon.map((b) => (
+              <ClosingBetRow key={b.id} bet={b} />
+            ))}
+          </div>
+        </div>
+      )}
+
       <div>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold">Top Recommendations</h2>
@@ -52,10 +70,38 @@ export default async function DashboardPage() {
           </div>
         ) : (
           <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {top.map((r) => <RecommendationCard key={r.id} rec={r} />)}
+            {top.map((r) => <RecommendationCard key={r.id} rec={r} bet={betsByTicker[r.market_ticker]} />)}
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function ClosingBetRow({ bet }: { bet: Bet }) {
+  const hoursLeft = Math.max(
+    0,
+    Math.round((new Date(bet.close_time).getTime() - Date.now()) / 3600000)
+  );
+  const pnl = bet.pnl;
+  const pnlLabel = pnl != null
+    ? pnl >= 0 ? `+$${pnl.toFixed(2)}` : `-$${Math.abs(pnl).toFixed(2)}`
+    : null;
+
+  const outcomeEl =
+    bet.outcome === 'won' ? <span className="text-emerald-400 font-semibold">WON {pnlLabel}</span>
+    : bet.outcome === 'lost' ? <span className="text-red-400 font-semibold">LOST {pnlLabel}</span>
+    : hoursLeft === 0
+      ? <span className="text-amber-400">Market closed — awaiting resolution</span>
+      : <span className="text-slate-400">{hoursLeft}h remaining</span>;
+
+  return (
+    <div className="rounded-lg border border-amber-900/40 bg-amber-950/20 px-4 py-3 flex items-center justify-between gap-4">
+      <p className="text-sm text-slate-200 line-clamp-1 flex-1">{bet.market_title}</p>
+      <span className="text-xs text-slate-400 shrink-0">
+        BET {bet.side.toUpperCase()} · ${bet.amount.toFixed(2)} @ {bet.fill_price}¢
+      </span>
+      <span className="text-xs shrink-0">{outcomeEl}</span>
     </div>
   );
 }

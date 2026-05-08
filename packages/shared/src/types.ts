@@ -56,3 +56,29 @@ export interface DashboardStats {
   win_rate: number | null;
   total_resolved: number;
 }
+
+export type BetOutcome = 'pending' | 'won' | 'lost' | 'cancelled';
+
+export interface Bet {
+  id: number;
+  recommendation_id: number;
+  market_ticker: string;
+  market_title: string;
+  side: Side;
+  fill_price: number;
+  amount: number;
+  outcome: BetOutcome;
+  pnl: number | null;
+  placed_at: string;
+  resolved_at: string | null;
+  close_time: string;
+}
+
+export interface PnlSummary {
+  total_bets: number;
+  total_wagered: number;
+  total_pnl: number;
+  win_rate: number | null;
+  pending_bets: number;
+  roi: number | null;
+}

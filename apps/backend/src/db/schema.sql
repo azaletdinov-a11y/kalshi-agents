@@ -43,3 +43,21 @@ CREATE TABLE IF NOT EXISTS pipeline_runs (
 CREATE INDEX IF NOT EXISTS idx_recommendations_created_at ON recommendations(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_recommendations_outcome ON recommendations(outcome);
 CREATE INDEX IF NOT EXISTS idx_pipeline_runs_started_at ON pipeline_runs(started_at DESC);
+
+CREATE TABLE IF NOT EXISTS bets (
+  id SERIAL PRIMARY KEY,
+  recommendation_id INTEGER REFERENCES recommendations(id) ON DELETE CASCADE,
+  market_ticker TEXT NOT NULL,
+  market_title TEXT NOT NULL,
+  side TEXT NOT NULL CHECK (side IN ('yes', 'no')),
+  fill_price DECIMAL(6,2) NOT NULL,
+  amount DECIMAL(10,2) NOT NULL,
+  outcome TEXT NOT NULL DEFAULT 'pending' CHECK (outcome IN ('pending', 'won', 'lost', 'cancelled')),
+  pnl DECIMAL(10,2),
+  placed_at TIMESTAMPTZ DEFAULT NOW(),
+  resolved_at TIMESTAMPTZ,
+  close_time TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_bets_outcome ON bets(outcome);
+CREATE INDEX IF NOT EXISTS idx_bets_close_time ON bets(close_time);

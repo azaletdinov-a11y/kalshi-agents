@@ -1,5 +1,6 @@
-import type { Recommendation } from '@kalshi/shared';
+import type { Recommendation, Bet } from '@kalshi/shared';
 import Link from 'next/link';
+import { RecordBetButton } from './RecordBetButton';
 
 const confidenceColor = {
   high: 'bg-emerald-900 text-emerald-300',
@@ -12,7 +13,7 @@ const sideColor = {
   no: 'bg-purple-900 text-purple-300',
 };
 
-export function RecommendationCard({ rec }: { rec: Recommendation }) {
+export function RecommendationCard({ rec, bet }: { rec: Recommendation; bet?: Bet }) {
   const daysLeft = Math.ceil(
     (new Date(rec.close_time).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
   );
@@ -59,12 +60,15 @@ export function RecommendationCard({ rec }: { rec: Recommendation }) {
         </span>
       </div>
 
-      <Link
-        href={`/markets/${rec.market_ticker}`}
-        className="text-xs text-emerald-400 hover:text-emerald-300 transition-colors"
-      >
-        View full analysis →
-      </Link>
+      <div className="flex items-center justify-between">
+        <Link
+          href={`/markets/${rec.market_ticker}`}
+          className="text-xs text-emerald-400 hover:text-emerald-300 transition-colors"
+        >
+          View full analysis →
+        </Link>
+        <RecordBetButton rec={rec} existingBet={bet} />
+      </div>
     </div>
   );
 }
