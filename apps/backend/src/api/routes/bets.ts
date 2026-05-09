@@ -121,20 +121,35 @@ router.patch('/:id', async (req, res) => {
 });
 
 router.get('/kalshi-fills-debug', async (_req, res) => {
-  // Fetch OpenAPI spec to discover actual portfolio endpoint paths
-  let spec: unknown = null;
+  const keyId = process.env.KALSHI_KEY_ID ?? '';
+  const privateKeyRaw = process.env.KALSHI_PRIVATE_KEY ?? '';
+  const privateKey = privateKeyRaw.replace(/\\n/g, '\n');
+
+  // Verify key is parseable
+  let keyOk = false;
+  let keyError = '';
   try {
-    const axios = (await import('axios')).default;
-    const r = await axios.get('https://api.elections.kalshi.com/trade-api/v2/openapi.json', { timeout: 5000 });
-    const paths = Object.keys(r.data?.paths ?? {}).filter((p: string) => p.includes('portfolio') || p.includes('fill') || p.includes('order'));
-    spec = { portfolio_paths: paths };
+    const crypto = await import('crypto');
+    const signer = crypto.createSign('RSA-SHA256');
+    signer.update('test');
+    signer.sign(privateKey, 'base64');
+    keyOk = true;
   } catch (e: unknown) {
-    spec = { spec_error: e instanceof Error ? e.message : String(e) };
+    keyError = e instanceof Error ? e.message : String(e);
   }
 
   const fills = await getMyFills(200).catch((e: Error) => ({ error: e.message }));
   const orders = await getMyOrders(undefined, 200).catch((e: Error) => ({ error: e.message }));
-  res.json({ spec, fills, orders });
+
+  res.json({
+    key_id: keyId,
+    private_key_length: privateKey.length,
+    private_key_starts: privateKey.slice(0, 40),
+    key_parseable: keyOk,
+    key_error: keyError || undefined,
+    fills,
+    orders,
+  });
 });
 
 router.post('/sync-kalshi', async (_req, res) => {
