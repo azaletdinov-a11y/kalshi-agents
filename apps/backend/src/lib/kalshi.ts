@@ -18,15 +18,19 @@ function sign(method: string, path: string): Record<string, string> {
   };
 }
 
-const client = axios.create({
-  baseURL: `https://api.elections.kalshi.com${BASE_PATH}`,
-});
+function makeClient(host: string) {
+  const c = axios.create({ baseURL: `${host}${BASE_PATH}` });
+  c.interceptors.request.use((config) => {
+    const path = `${BASE_PATH}${config.url ?? ''}`;
+    Object.assign(config.headers, sign(config.method?.toUpperCase() ?? 'GET', path));
+    return config;
+  });
+  return c;
+}
 
-client.interceptors.request.use((config) => {
-  const path = `${BASE_PATH}${config.url ?? ''}`;
-  Object.assign(config.headers, sign(config.method?.toUpperCase() ?? 'GET', path));
-  return config;
-});
+const client = makeClient('https://api.elections.kalshi.com');
+// Portfolio endpoints (fills, orders) are only on the main trading host
+const portfolioClient = makeClient('https://trading.kalshi.com');
 
 // All dollar fields are strings in "0.0000" format (0–1 range = 0%–100%)
 export interface KalshiMarketRaw {
@@ -52,10 +56,10 @@ export function parsePrice(dollarStr?: string): number {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-async function apiGet<T>(path: string, params: Record<string, string | number> = {}): Promise<T> {
+async function clientGet<T>(c: ReturnType<typeof makeClient>, path: string, params: Record<string, string | number> = {}): Promise<T> {
   for (let attempt = 0; attempt < 4; attempt++) {
     try {
-      const res = await client.get(path, { params });
+      const res = await c.get(path, { params });
       return res.data as T;
     } catch (err) {
       if (axios.isAxiosError(err) && err.response?.status === 429) {
@@ -71,6 +75,14 @@ async function apiGet<T>(path: string, params: Record<string, string | number> =
     }
   }
   throw new Error('[Kalshi] Max retries exceeded');
+}
+
+async function apiGet<T>(path: string, params: Record<string, string | number> = {}): Promise<T> {
+  return clientGet<T>(client, path, params);
+}
+
+async function portfolioGet<T>(path: string, params: Record<string, string | number> = {}): Promise<T> {
+  return clientGet<T>(portfolioClient, path, params);
 }
 
 export interface KalshiEvent {
@@ -147,7 +159,7 @@ export async function getMyFills(maxFills = 2000): Promise<KalshiFill[]> {
     if (cursor) params.cursor = cursor;
     if (fills.length > 0) await sleep(400);
 
-    const data = await apiGet<{ fills: KalshiFill[]; cursor?: string }>('/portfolio/fills', params);
+    const data = await portfolioGet<{ fills: KalshiFill[]; cursor?: string }>('/portfolio/fills', params);
     fills.push(...(data.fills ?? []));
     cursor = data.cursor;
 
@@ -183,7 +195,7 @@ export async function getMyOrders(status?: string, maxOrders = 2000): Promise<Ka
     if (cursor) params.cursor = cursor;
     if (orders.length > 0) await sleep(400);
 
-    const data = await apiGet<{ orders: KalshiOrder[]; cursor?: string }>('/portfolio/orders', params);
+    const data = await portfolioGet<{ orders: KalshiOrder[]; cursor?: string }>('/portfolio/orders', params);
     orders.push(...(data.orders ?? []));
     cursor = data.cursor;
 
