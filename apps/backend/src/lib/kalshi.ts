@@ -148,9 +148,9 @@ export interface KalshiFill {
   ticker: string;
   side: 'yes' | 'no';
   action: 'buy' | 'sell';
-  count: number;
-  yes_price: number;
-  no_price: number;
+  count_fp: string;
+  yes_price_dollars: string;
+  no_price_dollars: string;
   created_time: string;
 }
 

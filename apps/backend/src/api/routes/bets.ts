@@ -239,13 +239,14 @@ router.post('/sync-kalshi', async (_req, res) => {
 
   for (const f of fills) {
     if (f.action !== 'buy') continue;
-    const fillPrice = f.side === 'yes' ? f.yes_price : f.no_price;
+    const fillPrice = Math.round(parseFloat(f.side === 'yes' ? f.yes_price_dollars : f.no_price_dollars) * 100);
+    const count = parseFloat(f.count_fp);
     entries.push({
       key: `fill:${f.fill_id}`,
       ticker: f.ticker,
       side: f.side,
       fillPrice,
-      amount: Math.round(f.count * (fillPrice / 100) * 100) / 100,
+      amount: Math.round(count * (fillPrice / 100) * 100) / 100,
       placedAt: f.created_time,
     });
   }
