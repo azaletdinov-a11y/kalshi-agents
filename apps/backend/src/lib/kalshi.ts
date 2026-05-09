@@ -29,8 +29,8 @@ function makeClient(host: string) {
 }
 
 const client = makeClient('https://api.elections.kalshi.com');
-// Portfolio endpoints (fills, orders) are only on the main trading host
-const portfolioClient = makeClient('https://trading.kalshi.com');
+// Portfolio endpoints (fills, orders) live on the main exchange host
+const portfolioClient = makeClient('https://api.kalshi.com');
 
 // All dollar fields are strings in "0.0000" format (0–1 range = 0%–100%)
 export interface KalshiMarketRaw {
