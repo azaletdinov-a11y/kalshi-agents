@@ -44,7 +44,7 @@ export default async function DashboardPage() {
         />
       </div>
 
-      {ev && ev.pending_count > 0 && (
+      {ev && ev.pending_count > 0 && ev.total_ev != null && ev.total_exposure != null && (
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           <StatCard
             label="Expected P&L (pending bets)"
