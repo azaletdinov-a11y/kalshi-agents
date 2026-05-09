@@ -7,9 +7,11 @@ function sign(method: string, path: string): Record<string, string> {
   const timestamp = Date.now().toString();
   const message = `${timestamp}${method.toUpperCase()}${path}`;
   const privateKey = (process.env.KALSHI_PRIVATE_KEY ?? '').replace(/\\n/g, '\n');
-  const signer = crypto.createSign('RSA-SHA256');
-  signer.update(message);
-  const signature = signer.sign(privateKey, 'base64');
+  const signature = crypto.sign('SHA256', Buffer.from(message), {
+    key: privateKey,
+    padding: crypto.constants.RSA_PKCS1_PSS_PADDING,
+    saltLength: crypto.constants.RSA_PSS_SALTLEN_DIGEST,
+  }).toString('base64');
   return {
     'KALSHI-ACCESS-KEY': process.env.KALSHI_KEY_ID ?? '',
     'KALSHI-ACCESS-SIGNATURE': signature,
