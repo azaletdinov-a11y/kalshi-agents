@@ -29,8 +29,8 @@ function makeClient(host: string) {
 }
 
 const client = makeClient('https://api.elections.kalshi.com');
-// Portfolio endpoints (fills, orders) live on the main exchange host
-const portfolioClient = makeClient('https://api.kalshi.com');
+// Portfolio endpoints also on the elections host (only DNS that resolves from Railway)
+const portfolioClient = makeClient('https://api.elections.kalshi.com');
 
 // All dollar fields are strings in "0.0000" format (0–1 range = 0%–100%)
 export interface KalshiMarketRaw {
@@ -70,6 +70,8 @@ async function clientGet<T>(c: ReturnType<typeof makeClient>, path: string, para
       }
       if (axios.isAxiosError(err) && err.response) {
         console.error('[Kalshi] Error', err.response.status, JSON.stringify(err.response.data));
+        const detail = JSON.stringify(err.response.data);
+        throw new Error(`HTTP ${err.response.status}: ${detail}`);
       }
       throw err;
     }
