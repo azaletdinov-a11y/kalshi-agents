@@ -180,8 +180,8 @@ export interface KalshiOrder {
   action: 'buy' | 'sell';
   type: 'limit' | 'market';
   status: string; // 'resting' | 'canceled' | 'executed' | 'pending'
-  yes_price: number;
-  no_price: number;
+  yes_price_dollars: string;
+  no_price_dollars: string;
   count: number;           // original order size in contracts
   remaining_count: number; // unfilled contracts
   filled_count: number;    // filled contracts so far

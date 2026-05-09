@@ -255,7 +255,7 @@ router.post('/sync-kalshi', async (_req, res) => {
     // Import orders that have at least some filled contracts (resting or executed)
     if (o.action !== 'buy') continue;
     if (o.filled_count <= 0) continue;
-    const fillPrice = o.side === 'yes' ? o.yes_price : o.no_price;
+    const fillPrice = Math.round(parseFloat(o.side === 'yes' ? o.yes_price_dollars : o.no_price_dollars) * 100);
     entries.push({
       key: `order:${o.order_id}`,
       ticker: o.ticker,
