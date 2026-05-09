@@ -123,38 +123,38 @@ router.patch('/:id', async (req, res) => {
 router.get('/kalshi-fills-debug', async (_req, res) => {
   const keyId = process.env.KALSHI_KEY_ID ?? '';
   const privateKey = (process.env.KALSHI_PRIVATE_KEY ?? '').replace(/\\n/g, '\n');
+  const cr = await import('crypto');
+  const ax = (await import('axios')).default;
 
-  // Try signing with path WITHOUT /trade-api/v2 prefix
-  async function tryFills(signPath: string): Promise<unknown> {
+  async function tryRequest(label: string, signedPath: string, tsMs: boolean, url: string): Promise<unknown> {
     try {
-      const timestamp = Date.now().toString();
-      const message = `${timestamp}GET${signPath}`;
-      const cr = await import('crypto');
+      const timestamp = tsMs ? Date.now().toString() : Math.floor(Date.now() / 1000).toString();
+      const message = `${timestamp}GET${signedPath}`;
       const signer = cr.createSign('RSA-SHA256');
       signer.update(message);
       const sig = signer.sign(privateKey, 'base64');
-      const ax = (await import('axios')).default;
-      const r = await ax.get('https://api.elections.kalshi.com/trade-api/v2/portfolio/fills', {
-        params: { limit: 10 },
-        headers: {
-          'KALSHI-ACCESS-KEY': keyId,
-          'KALSHI-ACCESS-SIGNATURE': sig,
-          'KALSHI-ACCESS-TIMESTAMP': timestamp,
-        },
+      const r = await ax.get(url, {
+        params: { limit: 5 },
+        headers: { 'KALSHI-ACCESS-KEY': keyId, 'KALSHI-ACCESS-SIGNATURE': sig, 'KALSHI-ACCESS-TIMESTAMP': timestamp },
+        timeout: 8000,
       });
-      return { ok: true, count: r.data?.fills?.length ?? 0, signed_path: signPath };
+      return { label, ok: true, data: r.data };
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      return { ok: false, error: msg, signed_path: signPath };
+      const body = (e as {response?: {data?: unknown}})?.response?.data;
+      const status = (e as {response?: {status?: number}})?.response?.status;
+      return { label, ok: false, status, body };
     }
   }
 
-  const [withBase, withoutBase] = await Promise.all([
-    tryFills('/trade-api/v2/portfolio/fills'),
-    tryFills('/portfolio/fills'),
+  const results = await Promise.all([
+    tryRequest('ms+full_path', '/trade-api/v2/portfolio/fills', true, 'https://api.elections.kalshi.com/trade-api/v2/portfolio/fills'),
+    tryRequest('ms+short_path', '/portfolio/fills', true, 'https://api.elections.kalshi.com/trade-api/v2/portfolio/fills'),
+    tryRequest('sec+full_path', '/trade-api/v2/portfolio/fills', false, 'https://api.elections.kalshi.com/trade-api/v2/portfolio/fills'),
+    tryRequest('ms+balance', '/trade-api/v2/portfolio/balance', true, 'https://api.elections.kalshi.com/trade-api/v2/portfolio/balance'),
+    tryRequest('ms+me', '/trade-api/v2/me', true, 'https://api.elections.kalshi.com/trade-api/v2/me'),
   ]);
 
-  res.json({ key_id: keyId, with_base_path: withBase, without_base_path: withoutBase });
+  res.json({ key_id: keyId, server_time_ms: Date.now(), results });
 });
 
 router.post('/sync-kalshi', async (_req, res) => {
