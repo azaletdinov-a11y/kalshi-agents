@@ -122,34 +122,39 @@ router.patch('/:id', async (req, res) => {
 
 router.get('/kalshi-fills-debug', async (_req, res) => {
   const keyId = process.env.KALSHI_KEY_ID ?? '';
-  const privateKeyRaw = process.env.KALSHI_PRIVATE_KEY ?? '';
-  const privateKey = privateKeyRaw.replace(/\\n/g, '\n');
+  const privateKey = (process.env.KALSHI_PRIVATE_KEY ?? '').replace(/\\n/g, '\n');
 
-  // Verify key is parseable
-  let keyOk = false;
-  let keyError = '';
-  try {
-    const crypto = await import('crypto');
-    const signer = crypto.createSign('RSA-SHA256');
-    signer.update('test');
-    signer.sign(privateKey, 'base64');
-    keyOk = true;
-  } catch (e: unknown) {
-    keyError = e instanceof Error ? e.message : String(e);
+  // Try signing with path WITHOUT /trade-api/v2 prefix
+  async function tryFills(signPath: string): Promise<unknown> {
+    try {
+      const timestamp = Date.now().toString();
+      const message = `${timestamp}GET${signPath}`;
+      const cr = await import('crypto');
+      const signer = cr.createSign('RSA-SHA256');
+      signer.update(message);
+      const sig = signer.sign(privateKey, 'base64');
+      const ax = (await import('axios')).default;
+      const r = await ax.get('https://api.elections.kalshi.com/trade-api/v2/portfolio/fills', {
+        params: { limit: 10 },
+        headers: {
+          'KALSHI-ACCESS-KEY': keyId,
+          'KALSHI-ACCESS-SIGNATURE': sig,
+          'KALSHI-ACCESS-TIMESTAMP': timestamp,
+        },
+      });
+      return { ok: true, count: r.data?.fills?.length ?? 0, signed_path: signPath };
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return { ok: false, error: msg, signed_path: signPath };
+    }
   }
 
-  const fills = await getMyFills(200).catch((e: Error) => ({ error: e.message }));
-  const orders = await getMyOrders(undefined, 200).catch((e: Error) => ({ error: e.message }));
+  const [withBase, withoutBase] = await Promise.all([
+    tryFills('/trade-api/v2/portfolio/fills'),
+    tryFills('/portfolio/fills'),
+  ]);
 
-  res.json({
-    key_id: keyId,
-    private_key_length: privateKey.length,
-    private_key_starts: privateKey.slice(0, 40),
-    key_parseable: keyOk,
-    key_error: keyError || undefined,
-    fills,
-    orders,
-  });
+  res.json({ key_id: keyId, with_base_path: withBase, without_base_path: withoutBase });
 });
 
 router.post('/sync-kalshi', async (_req, res) => {
