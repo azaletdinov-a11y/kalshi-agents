@@ -165,9 +165,52 @@ router.get('/kalshi-fills-debug', async (_req, res) => {
     pubKeyFingerprint = `error: ${e instanceof Error ? e.message : String(e)}`;
   }
 
+  // Also try base64url encoding (some APIs require this instead of standard base64)
+  async function tryBase64url(signedPath: string): Promise<unknown> {
+    try {
+      const timestamp = Date.now().toString();
+      const message = `${timestamp}GET${signedPath}`;
+      const signer = cr.createSign('RSA-SHA256');
+      signer.update(message);
+      const sigBuf = signer.sign(privateKey);
+      const sig = sigBuf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+      const r = await ax.get('https://api.elections.kalshi.com/trade-api/v2/portfolio/fills', {
+        params: { limit: 5 },
+        headers: { 'KALSHI-ACCESS-KEY': keyId, 'KALSHI-ACCESS-SIGNATURE': sig, 'KALSHI-ACCESS-TIMESTAMP': timestamp },
+        timeout: 8000,
+      });
+      return { label: 'base64url', ok: true, data: r.data };
+    } catch (e: unknown) {
+      return { label: 'base64url', ok: false, status: (e as {response?: {status?: number}})?.response?.status, body: (e as {response?: {data?: unknown}})?.response?.data };
+    }
+  }
+
+  // PSS padding variant
+  async function tryPSS(): Promise<unknown> {
+    try {
+      const timestamp = Date.now().toString();
+      const message = `${timestamp}GET/trade-api/v2/portfolio/fills`;
+      const sig = cr.sign('SHA256', Buffer.from(message), {
+        key: privateKey,
+        padding: cr.constants.RSA_PKCS1_PSS_PADDING,
+        saltLength: cr.constants.RSA_PSS_SALTLEN_DIGEST,
+      }).toString('base64');
+      const r = await ax.get('https://api.elections.kalshi.com/trade-api/v2/portfolio/fills', {
+        params: { limit: 5 },
+        headers: { 'KALSHI-ACCESS-KEY': keyId, 'KALSHI-ACCESS-SIGNATURE': sig, 'KALSHI-ACCESS-TIMESTAMP': timestamp },
+        timeout: 8000,
+      });
+      return { label: 'pss_padding', ok: true, data: r.data };
+    } catch (e: unknown) {
+      return { label: 'pss_padding', ok: false, status: (e as {response?: {status?: number}})?.response?.status, body: (e as {response?: {data?: unknown}})?.response?.data };
+    }
+  }
+
   const results = await Promise.all([
     tryRequest('ms+full_path', '/trade-api/v2/portfolio/fills', true, 'https://api.elections.kalshi.com/trade-api/v2/portfolio/fills'),
     tryRequest('sec+full_path', '/trade-api/v2/portfolio/fills', false, 'https://api.elections.kalshi.com/trade-api/v2/portfolio/fills'),
+    tryBase64url('/trade-api/v2/portfolio/fills'),
+    tryPSS(),
   ]);
 
   res.json({ key_id: keyId, pub_key_fingerprint: pubKeyFingerprint, no_auth_result: noAuthResult, results });
