@@ -146,15 +146,31 @@ router.get('/kalshi-fills-debug', async (_req, res) => {
     }
   }
 
+  // No-auth request — tells us what error code Kalshi returns when totally unauthenticated
+  let noAuthResult: unknown;
+  try {
+    const r = await ax.get('https://api.elections.kalshi.com/trade-api/v2/portfolio/fills', { params: { limit: 1 }, timeout: 6000 });
+    noAuthResult = { ok: true, data: r.data };
+  } catch (e: unknown) {
+    noAuthResult = { status: (e as {response?: {status?: number}})?.response?.status, body: (e as {response?: {data?: unknown}})?.response?.data };
+  }
+
+  // Derive public key fingerprint from private key to verify which key pair this is
+  let pubKeyFingerprint = '';
+  try {
+    const keyObj = cr.createPublicKey(privateKey);
+    const pubDer = keyObj.export({ type: 'spki', format: 'der' }) as Buffer;
+    pubKeyFingerprint = cr.createHash('sha256').update(pubDer).digest('hex').slice(0, 32);
+  } catch (e: unknown) {
+    pubKeyFingerprint = `error: ${e instanceof Error ? e.message : String(e)}`;
+  }
+
   const results = await Promise.all([
     tryRequest('ms+full_path', '/trade-api/v2/portfolio/fills', true, 'https://api.elections.kalshi.com/trade-api/v2/portfolio/fills'),
-    tryRequest('ms+short_path', '/portfolio/fills', true, 'https://api.elections.kalshi.com/trade-api/v2/portfolio/fills'),
     tryRequest('sec+full_path', '/trade-api/v2/portfolio/fills', false, 'https://api.elections.kalshi.com/trade-api/v2/portfolio/fills'),
-    tryRequest('ms+balance', '/trade-api/v2/portfolio/balance', true, 'https://api.elections.kalshi.com/trade-api/v2/portfolio/balance'),
-    tryRequest('ms+me', '/trade-api/v2/me', true, 'https://api.elections.kalshi.com/trade-api/v2/me'),
   ]);
 
-  res.json({ key_id: keyId, server_time_ms: Date.now(), results });
+  res.json({ key_id: keyId, pub_key_fingerprint: pubKeyFingerprint, no_auth_result: noAuthResult, results });
 });
 
 router.post('/sync-kalshi', async (_req, res) => {
