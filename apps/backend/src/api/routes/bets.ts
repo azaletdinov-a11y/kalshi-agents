@@ -121,16 +121,20 @@ router.patch('/:id', async (req, res) => {
 });
 
 router.get('/kalshi-fills-debug', async (_req, res) => {
+  // Fetch OpenAPI spec to discover actual portfolio endpoint paths
+  let spec: unknown = null;
   try {
-    const [fills, orders] = await Promise.all([
-      getMyFills(200).catch((e: Error) => ({ error: e.message })),
-      getMyOrders(undefined, 200).catch((e: Error) => ({ error: e.message })),
-    ]);
-    res.json({ fills, orders });
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    res.status(502).json({ error: msg });
+    const axios = (await import('axios')).default;
+    const r = await axios.get('https://api.elections.kalshi.com/trade-api/v2/openapi.json', { timeout: 5000 });
+    const paths = Object.keys(r.data?.paths ?? {}).filter((p: string) => p.includes('portfolio') || p.includes('fill') || p.includes('order'));
+    spec = { portfolio_paths: paths };
+  } catch (e: unknown) {
+    spec = { spec_error: e instanceof Error ? e.message : String(e) };
   }
+
+  const fills = await getMyFills(200).catch((e: Error) => ({ error: e.message }));
+  const orders = await getMyOrders(undefined, 200).catch((e: Error) => ({ error: e.message }));
+  res.json({ spec, fills, orders });
 });
 
 router.post('/sync-kalshi', async (_req, res) => {
