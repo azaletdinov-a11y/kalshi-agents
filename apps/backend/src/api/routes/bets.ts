@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { db } from '../../db/client';
-import { getMyFills, getMyOrders, getMarket, getPortfolioBalance } from '../../lib/kalshi';
+import { getMyFills, getMarket, getPortfolioBalance } from '../../lib/kalshi';
 
 const router = Router();
 
@@ -228,17 +228,13 @@ router.get('/kalshi-balance', async (_req, res) => {
 router.post('/sync-kalshi', async (req, res) => {
   const reset = req.body?.reset === true;
   let fills: Awaited<ReturnType<typeof getMyFills>> = [];
-  let orders: Awaited<ReturnType<typeof getMyOrders>> = [];
   const fetchErrors: string[] = [];
 
   try { fills = await getMyFills(); } catch (e: unknown) {
     fetchErrors.push(`fills: ${e instanceof Error ? e.message : String(e)}`);
   }
-  try { orders = await getMyOrders(); } catch (e: unknown) {
-    fetchErrors.push(`orders: ${e instanceof Error ? e.message : String(e)}`);
-  }
 
-  if (fetchErrors.length === 2) {
+  if (fetchErrors.length > 0 && fills.length === 0) {
     return res.status(502).json({ error: fetchErrors.join(' | ') });
   }
 
@@ -247,7 +243,7 @@ router.post('/sync-kalshi', async (req, res) => {
     console.log('[Bets] Reset: cleared all bets before re-import');
   }
 
-  // Normalise fills and orders into a common shape with a unique key
+  // Only import fills — fills are the ground truth for executed trades
   type Entry = { key: string; ticker: string; side: 'yes' | 'no'; fillPrice: number; amount: number; placedAt: string };
 
   const entries: Entry[] = [];
@@ -256,31 +252,14 @@ router.post('/sync-kalshi', async (req, res) => {
     if (f.action !== 'buy') continue;
     const fillPrice = Math.round(parseFloat(f.side === 'yes' ? f.yes_price_dollars : f.no_price_dollars) * 100);
     const count = parseFloat(f.count_fp);
+    const amount = Math.round(count * parseFloat(f.side === 'yes' ? f.yes_price_dollars : f.no_price_dollars) * 100) / 100;
     entries.push({
       key: `fill:${f.fill_id}`,
       ticker: f.ticker,
       side: f.side,
       fillPrice,
-      amount: Math.round(count * (fillPrice / 100) * 100) / 100,
+      amount,
       placedAt: f.created_time,
-    });
-  }
-
-  for (const o of orders) {
-    // Import orders that have at least some filled contracts (resting or executed)
-    if (o.action !== 'buy') continue;
-    if (o.filled_count <= 0) continue;
-    const rawPrice = o.side === 'yes' ? o.yes_price_dollars : o.no_price_dollars;
-    const fillPrice = rawPrice != null
-      ? Math.round(parseFloat(rawPrice) * 100)
-      : (o.side === 'yes' ? (o as unknown as Record<string, number>).yes_price : (o as unknown as Record<string, number>).no_price);
-    entries.push({
-      key: `order:${o.order_id}`,
-      ticker: o.ticker,
-      side: o.side,
-      fillPrice,
-      amount: Math.round(o.filled_count * (fillPrice / 100) * 100) / 100,
-      placedAt: o.created_time,
     });
   }
 
@@ -328,8 +307,8 @@ router.post('/sync-kalshi', async (req, res) => {
     }
   }
 
-  console.log(`[Bets] Kalshi sync: ${imported} imported, ${skipped} already existed (${fills.length} fills + ${orders.length} orders)`);
-  res.json({ imported, skipped, total_fills: fills.length, total_orders: orders.length, errors: [...fetchErrors, ...errors] });
+  console.log(`[Bets] Kalshi sync: ${imported} imported, ${skipped} already existed (${fills.length} fills)`);
+  res.json({ imported, skipped, total_fills: fills.length, total_orders: 0, errors: [...fetchErrors, ...errors] });
 });
 
 router.delete('/:id', async (req, res) => {
