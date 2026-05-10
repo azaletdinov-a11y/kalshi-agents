@@ -243,23 +243,37 @@ router.post('/sync-kalshi', async (req, res) => {
     console.log('[Bets] Reset: cleared all bets before re-import');
   }
 
-  // Only import fills — fills are the ground truth for executed trades
-  type Entry = { key: string; ticker: string; side: 'yes' | 'no'; fillPrice: number; amount: number; placedAt: string };
-
-  const entries: Entry[] = [];
+  // Group fills by order_id — one order = one bet entry, with weighted avg price
+  type OrderAgg = { ticker: string; side: 'yes' | 'no'; totalAmount: number; totalContracts: number; placedAt: string };
+  const byOrder = new Map<string, OrderAgg>();
 
   for (const f of fills) {
     if (f.action !== 'buy') continue;
-    const fillPrice = Math.round(parseFloat(f.side === 'yes' ? f.yes_price_dollars : f.no_price_dollars) * 100);
+    const priceD = parseFloat(f.side === 'yes' ? f.yes_price_dollars : f.no_price_dollars);
     const count = parseFloat(f.count_fp);
-    const amount = Math.round(count * parseFloat(f.side === 'yes' ? f.yes_price_dollars : f.no_price_dollars) * 100) / 100;
+    if (isNaN(priceD) || isNaN(count)) continue;
+    const existing = byOrder.get(f.order_id);
+    if (existing) {
+      existing.totalAmount += count * priceD;
+      existing.totalContracts += count;
+      if (f.created_time < existing.placedAt) existing.placedAt = f.created_time;
+    } else {
+      byOrder.set(f.order_id, { ticker: f.ticker, side: f.side, totalAmount: count * priceD, totalContracts: count, placedAt: f.created_time });
+    }
+  }
+
+  type Entry = { key: string; ticker: string; side: 'yes' | 'no'; fillPrice: number; amount: number; placedAt: string };
+  const entries: Entry[] = [];
+
+  for (const [orderId, agg] of byOrder) {
+    const fillPrice = Math.round((agg.totalAmount / agg.totalContracts) * 100);
     entries.push({
-      key: `fill:${f.fill_id}`,
-      ticker: f.ticker,
-      side: f.side,
+      key: `order:${orderId}`,
+      ticker: agg.ticker,
+      side: agg.side,
       fillPrice,
-      amount,
-      placedAt: f.created_time,
+      amount: Math.round(agg.totalAmount * 100) / 100,
+      placedAt: agg.placedAt,
     });
   }
 

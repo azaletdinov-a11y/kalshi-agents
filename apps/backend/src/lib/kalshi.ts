@@ -145,6 +145,7 @@ export async function getMarket(ticker: string): Promise<KalshiMarketResolved> {
 export interface KalshiFill {
   fill_id: string;
   trade_id: string;
+  order_id: string;
   ticker: string;
   side: 'yes' | 'no';
   action: 'buy' | 'sell';
