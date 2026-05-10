@@ -157,11 +157,24 @@ export async function getMarketPrice(ticker: string): Promise<{ yes_ask: number;
   return get(`/api/markets/${ticker}/price`);
 }
 
-export async function syncKalshiBets(): Promise<{ imported: number; skipped: number; total_fills: number; total_orders: number; errors: string[] }> {
-  const res = await fetch(`${BASE}/api/bets/sync-kalshi`, { method: 'POST' });
+export async function syncKalshiBets(reset = false): Promise<{ imported: number; skipped: number; total_fills: number; total_orders: number; errors: string[] }> {
+  const res = await fetch(`${BASE}/api/bets/sync-kalshi`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reset }),
+  });
   if (!res.ok) {
     const body = await res.json().catch(() => ({})) as { error?: string };
     throw new Error(body.error ?? `HTTP ${res.status}`);
   }
   return res.json();
+}
+
+export async function getKalshiBalance(): Promise<number | null> {
+  try {
+    const data = await get<{ balance: number }>('/api/bets/kalshi-balance');
+    return data.balance;
+  } catch {
+    return null;
+  }
 }

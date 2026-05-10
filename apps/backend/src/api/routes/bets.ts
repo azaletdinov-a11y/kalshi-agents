@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { db } from '../../db/client';
-import { getMyFills, getMyOrders, getMarket } from '../../lib/kalshi';
+import { getMyFills, getMyOrders, getMarket, getPortfolioBalance } from '../../lib/kalshi';
 
 const router = Router();
 
@@ -216,7 +216,17 @@ router.get('/kalshi-fills-debug', async (_req, res) => {
   res.json({ key_id: keyId, pub_key_fingerprint: pubKeyFingerprint, no_auth_result: noAuthResult, results });
 });
 
-router.post('/sync-kalshi', async (_req, res) => {
+router.get('/kalshi-balance', async (_req, res) => {
+  try {
+    const balance = await getPortfolioBalance();
+    res.json({ balance });
+  } catch (e: unknown) {
+    res.status(502).json({ error: e instanceof Error ? e.message : String(e) });
+  }
+});
+
+router.post('/sync-kalshi', async (req, res) => {
+  const reset = req.body?.reset === true;
   let fills: Awaited<ReturnType<typeof getMyFills>> = [];
   let orders: Awaited<ReturnType<typeof getMyOrders>> = [];
   const fetchErrors: string[] = [];
@@ -230,6 +240,11 @@ router.post('/sync-kalshi', async (_req, res) => {
 
   if (fetchErrors.length === 2) {
     return res.status(502).json({ error: fetchErrors.join(' | ') });
+  }
+
+  if (reset) {
+    await db.query('DELETE FROM bets');
+    console.log('[Bets] Reset: cleared all bets before re-import');
   }
 
   // Normalise fills and orders into a common shape with a unique key

@@ -1,4 +1,4 @@
-import { getBets, getPnlSummary, getBetsByCategory, getCalibration, getBankroll } from '@/lib/api';
+import { getBets, getPnlSummary, getBetsByCategory, getCalibration, getBankroll, getKalshiBalance } from '@/lib/api';
 import { EditBetButton } from '@/components/EditBetButton';
 import { DeleteBetButton } from '@/components/DeleteBetButton';
 import { CalibrationChart } from '@/components/CalibrationChart';
@@ -16,12 +16,13 @@ function kalshiPnl(amount: number, fillPrice: number): number {
 }
 
 export default async function PnlPage() {
-  const [summary, bets, byCategory, calibration, bankroll] = await Promise.all([
+  const [summary, bets, byCategory, calibration, bankroll, kalshiBalance] = await Promise.all([
     getPnlSummary().catch(() => null),
     getBets().catch(() => []),
     getBetsByCategory().catch(() => []),
     getCalibration().catch(() => []),
     getBankroll().catch(() => null),
+    getKalshiBalance(),
   ]);
 
   const activeBets = bets.filter((b) => b.outcome !== 'cancelled');
@@ -36,6 +37,9 @@ export default async function PnlPage() {
       <div className="grid md:grid-cols-4 gap-4">
         {bankroll && <BankrollEditor bankroll={bankroll} />}
         <div className="md:col-span-3 grid grid-cols-2 md:grid-cols-3 gap-4">
+        {kalshiBalance != null && (
+          <StatCard label="Kalshi Balance" value={`$${kalshiBalance.toFixed(2)}`} color="emerald" />
+        )}
         <StatCard
           label="Total Wagered"
           value={summary ? `$${summary.total_wagered.toFixed(2)}` : '—'}

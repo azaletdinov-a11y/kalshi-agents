@@ -154,6 +154,11 @@ export interface KalshiFill {
   created_time: string;
 }
 
+export async function getPortfolioBalance(): Promise<number> {
+  const data = await portfolioGet<{ balance: string }>('/portfolio/balance');
+  return Math.round(parseFloat(data.balance) * 100) / 100;
+}
+
 export async function getMyFills(maxFills = 2000): Promise<KalshiFill[]> {
   const fills: KalshiFill[] = [];
   let cursor: string | undefined;
