@@ -9,6 +9,7 @@ import marketsRouter from './api/routes/markets';
 import pipelineRouter from './api/routes/pipeline';
 import betsRouter from './api/routes/bets';
 import settingsRouter from './api/routes/settings';
+import whalesRouter from './api/routes/whales';
 import { startScheduler } from './scheduler/cron';
 import { db } from './db/client';
 
@@ -25,6 +26,7 @@ app.use('/api/markets', marketsRouter);
 app.use('/api/pipeline', pipelineRouter);
 app.use('/api/bets', betsRouter);
 app.use('/api/settings', settingsRouter);
+app.use('/api/whales', whalesRouter);
 
 const MIGRATIONS = `
 CREATE TABLE IF NOT EXISTS markets (
@@ -85,6 +87,18 @@ CREATE INDEX IF NOT EXISTS idx_recommendations_outcome ON recommendations(outcom
 CREATE INDEX IF NOT EXISTS idx_pipeline_runs_started_at ON pipeline_runs(started_at DESC);
 CREATE INDEX IF NOT EXISTS idx_bets_outcome ON bets(outcome);
 CREATE INDEX IF NOT EXISTS idx_bets_close_time ON bets(close_time);
+
+CREATE TABLE IF NOT EXISTS market_snapshots (
+  id SERIAL PRIMARY KEY,
+  ticker TEXT NOT NULL,
+  title TEXT,
+  category TEXT,
+  yes_price INT NOT NULL,
+  volume_24h BIGINT NOT NULL,
+  captured_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_market_snapshots_ticker_time ON market_snapshots(ticker, captured_at DESC);
+CREATE INDEX IF NOT EXISTS idx_market_snapshots_captured_at ON market_snapshots(captured_at DESC);
 
 CREATE TABLE IF NOT EXISTS settings (
   key TEXT PRIMARY KEY,

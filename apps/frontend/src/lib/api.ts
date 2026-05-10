@@ -184,6 +184,30 @@ export async function getAutoBetSettings(): Promise<AutoBetSettings> {
   return get<AutoBetSettings>('/api/settings/auto-bet');
 }
 
+export interface WhaleAlert {
+  ticker: string;
+  title: string;
+  category: string;
+  yes_price: number;
+  prev_price: number;
+  price_delta: number;
+  volume_24h: number;
+  prev_vol24h: number;
+  vol_delta: number;
+  vol_delta_usd: number;
+  captured_at: string;
+}
+
+export interface WhaleData {
+  alerts: WhaleAlert[];
+  last_snapshot: string | null;
+  snapshot_count: number;
+}
+
+export async function getWhales(minVol = 100, minPrice = 8): Promise<WhaleData> {
+  return get<WhaleData>(`/api/whales?min_vol=${minVol}&min_price=${minPrice}`);
+}
+
 export async function getKalshiBalance(): Promise<KalshiBalance | null> {
   try {
     return await get<KalshiBalance>('/api/bets/kalshi-balance');

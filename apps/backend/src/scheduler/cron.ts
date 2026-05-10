@@ -1,6 +1,7 @@
 import cron from 'node-cron';
 import { runPipeline } from '../agents/pipeline';
 import { resolveSettledMarkets } from '../agents/resolver';
+import { snapshotMarkets } from '../agents/whale-hunter';
 
 export function startScheduler(): void {
   const schedule = process.env.PIPELINE_SCHEDULE ?? '0 */2 * * *';
@@ -26,6 +27,15 @@ export function startScheduler(): void {
       await resolveSettledMarkets();
     } catch (err) {
       console.error('[Scheduler] Resolver failed:', err);
+    }
+  });
+
+  // Snapshot top markets every 15 min for whale detection
+  cron.schedule('*/15 * * * *', async () => {
+    try {
+      await snapshotMarkets();
+    } catch (err) {
+      console.error('[Scheduler] Whale snapshot failed:', err);
     }
   });
 

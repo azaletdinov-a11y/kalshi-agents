@@ -17,6 +17,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <a href="/recommendations" className="nav-link">Recommendations</a>
             <a href="/pnl" className="nav-link">P&amp;L</a>
             <a href="/history" className="nav-link">History</a>
+            <a href="/whales" className="nav-link">Whale Hunter</a>
           </nav>
           <main className="flex-1 p-8 overflow-auto">{children}</main>
         </div>
