@@ -3,6 +3,7 @@ import { scanMarkets } from './market-scanner';
 import { researchMarket } from './researcher';
 import { estimateMarket } from './estimator';
 import { evaluateAndStore } from './risk-manager';
+import { runAutoBettor } from './auto-bettor';
 
 let isRunning = false;
 
@@ -57,6 +58,16 @@ export async function runPipeline(): Promise<{ marketsScanned: number; recommend
     console.log(
       `[Pipeline] Done — ${marketsScanned} markets, ${recommendationsGenerated} recommendations`
     );
+
+    // Auto-bet after recommendations are generated
+    try {
+      const autoBet = await runAutoBettor();
+      if (autoBet.placed > 0 || autoBet.errors.length > 0) {
+        console.log(`[AutoBet] placed=${autoBet.placed} skipped=${autoBet.skipped} errors=${autoBet.errors.length}`);
+      }
+    } catch (e) {
+      console.error('[AutoBet] Failed:', e);
+    }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     await db.query(

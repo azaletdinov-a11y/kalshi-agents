@@ -178,6 +178,12 @@ export async function resolveOutcomes(): Promise<{ resolved: number }> {
   return res.json();
 }
 
+export interface AutoBetSettings { enabled: boolean; max_per_bet: number; min_edge: number; dry_run: boolean; }
+
+export async function getAutoBetSettings(): Promise<AutoBetSettings> {
+  return get<AutoBetSettings>('/api/settings/auto-bet');
+}
+
 export async function getKalshiBalance(): Promise<KalshiBalance | null> {
   try {
     return await get<KalshiBalance>('/api/bets/kalshi-balance');

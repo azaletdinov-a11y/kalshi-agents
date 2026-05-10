@@ -1,9 +1,10 @@
-import { getBets, getPnlSummary, getBetsByCategory, getCalibration, getBankroll, getKalshiBalance } from '@/lib/api';
+import { getBets, getPnlSummary, getBetsByCategory, getCalibration, getBankroll, getKalshiBalance, getAutoBetSettings } from '@/lib/api';
 import { EditBetButton } from '@/components/EditBetButton';
 import { DeleteBetButton } from '@/components/DeleteBetButton';
 import { CalibrationChart } from '@/components/CalibrationChart';
 import { BankrollEditor } from '@/components/BankrollEditor';
 import { SyncKalshiButton } from '@/components/SyncKalshiButton';
+import { AutoBetSettings } from '@/components/AutoBetSettings';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,13 +17,14 @@ function kalshiPnl(amount: number, fillPrice: number): number {
 }
 
 export default async function PnlPage() {
-  const [summary, bets, byCategory, calibration, bankroll, kalshiBalance] = await Promise.all([
+  const [summary, bets, byCategory, calibration, bankroll, kalshiBalance, autoBetSettings] = await Promise.all([
     getPnlSummary().catch(() => null),
     getBets().catch(() => []),
     getBetsByCategory().catch(() => []),
     getCalibration().catch(() => []),
     getBankroll().catch(() => null),
     getKalshiBalance(),
+    getAutoBetSettings().catch(() => null),
   ]);
 
   const activeBets = bets.filter((b) => b.outcome !== 'cancelled');
@@ -36,6 +38,7 @@ export default async function PnlPage() {
 
       <div className="grid md:grid-cols-4 gap-4">
         {bankroll && <BankrollEditor bankroll={bankroll} />}
+      {autoBetSettings && <AutoBetSettings initial={autoBetSettings} />}
         <div className="md:col-span-3 grid grid-cols-2 md:grid-cols-3 gap-4">
         {kalshiBalance != null && (
           <StatCard label="Kalshi Cash" value={`$${kalshiBalance.cash.toFixed(2)}`} />

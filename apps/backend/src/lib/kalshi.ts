@@ -81,6 +81,19 @@ async function clientGet<T>(c: ReturnType<typeof makeClient>, path: string, para
   throw new Error('[Kalshi] Max retries exceeded');
 }
 
+async function clientPost<T>(c: ReturnType<typeof makeClient>, path: string, body: unknown): Promise<T> {
+  try {
+    const res = await c.post(path, body);
+    return res.data as T;
+  } catch (err) {
+    if (axios.isAxiosError(err) && err.response) {
+      console.error('[Kalshi] POST error', err.response.status, JSON.stringify(err.response.data));
+      throw new Error(`HTTP ${err.response.status}: ${JSON.stringify(err.response.data)}`);
+    }
+    throw err;
+  }
+}
+
 async function apiGet<T>(path: string, params: Record<string, string | number> = {}): Promise<T> {
   return clientGet<T>(client, path, params);
 }
@@ -257,4 +270,35 @@ export async function getOpenMarkets(maxMarkets = 200): Promise<KalshiMarketRaw[
   } while (true);
 
   return markets.slice(0, maxMarkets);
+}
+
+export interface PlacedOrder {
+  order_id: string;
+  status: string;
+  ticker: string;
+  side: 'yes' | 'no';
+  yes_price: number;
+  no_price: number;
+  count: number;
+  filled_count: number;
+}
+
+export async function placeOrder(
+  ticker: string,
+  side: 'yes' | 'no',
+  count: number,       // number of contracts (integer)
+  priceInCents: number // limit price in cents (0–100)
+): Promise<PlacedOrder> {
+  const body = {
+    ticker,
+    side,
+    action: 'buy',
+    count,
+    type: 'limit',
+    yes_price: priceInCents,
+    expiration_ts: null,
+  };
+  console.log(`[Kalshi] Placing order: ${ticker} ${side.toUpperCase()} ${count} @ ${priceInCents}¢`);
+  const data = await clientPost<{ order: PlacedOrder }>(portfolioClient, '/orders', body);
+  return data.order;
 }
