@@ -38,7 +38,10 @@ export default async function PnlPage() {
         {bankroll && <BankrollEditor bankroll={bankroll} />}
         <div className="md:col-span-3 grid grid-cols-2 md:grid-cols-3 gap-4">
         {kalshiBalance != null && (
-          <StatCard label="Kalshi Balance" value={`$${kalshiBalance.toFixed(2)}`} color="emerald" />
+          <StatCard label="Kalshi Cash" value={`$${kalshiBalance.cash.toFixed(2)}`} />
+        )}
+        {kalshiBalance != null && (
+          <StatCard label="Portfolio Value" value={`$${kalshiBalance.portfolio_value.toFixed(2)}`} color="emerald" />
         )}
         <StatCard
           label="Total Wagered"

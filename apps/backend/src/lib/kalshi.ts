@@ -155,9 +155,17 @@ export interface KalshiFill {
   created_time: string;
 }
 
-export async function getPortfolioBalance(): Promise<number> {
+export interface KalshiBalance {
+  cash: number;
+  portfolio_value: number;
+}
+
+export async function getPortfolioBalance(): Promise<KalshiBalance> {
   const data = await portfolioGet<{ balance: number; portfolio_value: number }>('/portfolio/balance');
-  return Math.round((data.portfolio_value ?? data.balance ?? 0) * 100) / 100;
+  return {
+    cash: Math.round((data.balance ?? 0) * 100) / 100,
+    portfolio_value: Math.round((data.portfolio_value ?? 0) * 100) / 100,
+  };
 }
 
 export async function getMyFills(maxFills = 2000): Promise<KalshiFill[]> {

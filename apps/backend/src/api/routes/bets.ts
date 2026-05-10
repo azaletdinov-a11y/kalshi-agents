@@ -219,7 +219,7 @@ router.get('/kalshi-fills-debug', async (_req, res) => {
 router.get('/kalshi-balance', async (_req, res) => {
   try {
     const balance = await getPortfolioBalance();
-    res.json({ balance });
+    res.json(balance);
   } catch (e: unknown) {
     res.status(502).json({ error: e instanceof Error ? e.message : String(e) });
   }
@@ -323,7 +323,56 @@ router.post('/sync-kalshi', async (req, res) => {
   }
 
   console.log(`[Bets] Kalshi sync: ${imported} imported, ${skipped} already existed (${fills.length} fills)`);
-  res.json({ imported, skipped, total_fills: fills.length, total_orders: 0, errors: [...fetchErrors, ...errors] });
+
+  // Resolve outcomes for all pending bets whose market has closed
+  const resolved = await resolveOutcomes();
+  console.log(`[Bets] Resolved ${resolved} outcomes`);
+
+  res.json({ imported, skipped, resolved, total_fills: fills.length, total_orders: 0, errors: [...fetchErrors, ...errors] });
+});
+
+async function resolveOutcomes(): Promise<number> {
+  const pending = await db.query(`
+    SELECT id, market_ticker, side, fill_price, amount
+    FROM bets
+    WHERE outcome = 'pending' AND (close_time IS NULL OR close_time <= NOW())
+  `);
+
+  let resolved = 0;
+  for (const bet of pending.rows) {
+    try {
+      const market = await getMarket(bet.market_ticker as string);
+      const result = market.result;
+      if (!result || result === '') continue;
+
+      const won = result === bet.side;
+      const outcome = won ? 'won' : 'lost';
+      const fillPrice = Number(bet.fill_price);
+      const amount = Number(bet.amount);
+      let pnl: number;
+      if (won) {
+        const contracts = amount / (fillPrice / 100);
+        const grossProfit = contracts - amount;
+        pnl = Math.round(grossProfit * 0.93 * 100) / 100;
+      } else {
+        pnl = -amount;
+      }
+
+      await db.query(
+        `UPDATE bets SET outcome=$1, pnl=$2, resolved_at=NOW() WHERE id=$3`,
+        [outcome, pnl, bet.id]
+      );
+      resolved++;
+    } catch {
+      // skip markets that fail to fetch
+    }
+  }
+  return resolved;
+}
+
+router.post('/resolve-outcomes', async (_req, res) => {
+  const resolved = await resolveOutcomes();
+  res.json({ resolved });
 });
 
 router.delete('/:id', async (req, res) => {

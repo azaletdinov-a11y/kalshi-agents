@@ -170,10 +170,11 @@ export async function syncKalshiBets(reset = false): Promise<{ imported: number;
   return res.json();
 }
 
-export async function getKalshiBalance(): Promise<number | null> {
+export interface KalshiBalance { cash: number; portfolio_value: number; }
+
+export async function getKalshiBalance(): Promise<KalshiBalance | null> {
   try {
-    const data = await get<{ balance: number }>('/api/bets/kalshi-balance');
-    return data.balance;
+    return await get<KalshiBalance>('/api/bets/kalshi-balance');
   } catch {
     return null;
   }
