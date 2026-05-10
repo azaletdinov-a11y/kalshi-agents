@@ -92,6 +92,7 @@ CREATE TABLE IF NOT EXISTS settings (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 ALTER TABLE bets ADD COLUMN IF NOT EXISTS kalshi_fill_id TEXT UNIQUE;
+DELETE FROM bets WHERE fill_price::text = 'NaN' OR amount::text = 'NaN';
 `;
 
 async function start() {

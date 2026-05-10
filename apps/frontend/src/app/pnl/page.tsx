@@ -76,9 +76,9 @@ export default async function PnlPage() {
                   <tr key={cat.category} className="border-b border-slate-800/50">
                     <td className="px-4 py-3 text-slate-200">{cat.category}</td>
                     <td className="px-4 py-3 text-right text-slate-400">{cat.total_bets}</td>
-                    <td className="px-4 py-3 text-right text-slate-400">${cat.total_wagered.toFixed(2)}</td>
-                    <td className={`px-4 py-3 text-right font-semibold ${cat.total_pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                      {formatPnl(cat.total_pnl)}
+                    <td className="px-4 py-3 text-right text-slate-400">${(cat.total_wagered ?? 0).toFixed(2)}</td>
+                    <td className={`px-4 py-3 text-right font-semibold ${(cat.total_pnl ?? 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {formatPnl(cat.total_pnl ?? 0)}
                     </td>
                     <td className="px-4 py-3 text-right text-slate-400">
                       {cat.win_rate != null ? `${cat.win_rate}%` : '—'}
@@ -142,7 +142,7 @@ export default async function PnlPage() {
                         {b.side.toUpperCase()}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right text-slate-300">${b.amount.toFixed(2)}</td>
+                    <td className="px-4 py-3 text-right text-slate-300">${(b.amount ?? 0).toFixed(2)}</td>
                     <td className="px-4 py-3 text-right text-slate-400">{b.fill_price}¢</td>
                     <td className="px-4 py-3 text-right text-slate-400">+${expectedWin.toFixed(2)}</td>
                     <td className="px-4 py-3 text-center">

@@ -38,8 +38,8 @@ router.get('/ev-summary', async (_req, res) => {
   `);
   const row = result.rows[0];
   res.json({
-    total_ev: Math.round(Number(row.total_ev) * 100) / 100,
-    total_exposure: Math.round(Number(row.total_exposure) * 100) / 100,
+    total_ev: Math.round((Number(row.total_ev) || 0) * 100) / 100,
+    total_exposure: Math.round((Number(row.total_exposure) || 0) * 100) / 100,
     pending_count: Number(row.pending_count),
   });
 });

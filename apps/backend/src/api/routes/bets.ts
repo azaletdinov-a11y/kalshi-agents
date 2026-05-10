@@ -35,8 +35,8 @@ router.get('/summary', async (_req, res) => {
   const row = result.rows[0];
   const won = Number(row.won);
   const resolved = Number(row.resolved);
-  const totalWagered = Number(row.total_wagered);
-  const totalPnl = Number(row.total_pnl);
+  const totalWagered = Number(row.total_wagered) || 0;
+  const totalPnl = Number(row.total_pnl) || 0;
   res.json({
     total_bets: Number(row.total_bets),
     total_wagered: totalWagered,
@@ -64,8 +64,8 @@ router.get('/by-category', async (_req, res) => {
   res.json(result.rows.map((r) => ({
     category: r.category ?? 'Other',
     total_bets: Number(r.total_bets),
-    total_wagered: Number(r.total_wagered),
-    total_pnl: Number(r.total_pnl),
+    total_wagered: Number(r.total_wagered) || 0,
+    total_pnl: Number(r.total_pnl) || 0,
     win_rate: Number(r.resolved) > 0 ? Math.round((Number(r.wins) / Number(r.resolved)) * 100) : null,
   })));
 });
