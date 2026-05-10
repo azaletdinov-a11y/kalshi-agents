@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { syncKalshiBets } from '@/lib/api';
+import { syncKalshiBets, resolveOutcomes } from '@/lib/api';
 
 export function SyncKalshiButton() {
   const [state, setState] = useState<'idle' | 'syncing' | 'resetting' | 'done'>('idle');
@@ -27,13 +27,27 @@ export function SyncKalshiButton() {
     }
   }
 
+  async function checkOutcomes() {
+    setState('syncing');
+    try {
+      const r = await resolveOutcomes();
+      setResult({ imported: r.resolved, skipped: 0 });
+      setState('done');
+      router.refresh();
+      setTimeout(() => setState('idle'), 4000);
+    } catch (err: unknown) {
+      alert(`Failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setState('idle');
+    }
+  }
+
   const busy = state === 'syncing' || state === 'resetting';
 
   return (
     <div className="flex items-center gap-3">
       {state === 'done' && result && (
         <span className="text-xs text-emerald-400">
-          {result.imported} imported · {result.skipped} already tracked
+          {result.skipped === 0 ? `${result.imported} resolved` : `${result.imported} imported · ${result.skipped} already tracked`}
         </span>
       )}
       <button
@@ -45,6 +59,13 @@ export function SyncKalshiButton() {
           <span className="w-3 h-3 rounded-full border-2 border-white border-t-transparent animate-spin" />
         )}
         {state === 'syncing' ? 'Syncing…' : '↓ Sync Kalshi'}
+      </button>
+      <button
+        onClick={checkOutcomes}
+        disabled={busy}
+        className="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white text-sm transition-colors"
+      >
+        ✓ Check Outcomes
       </button>
       <button
         onClick={() => {

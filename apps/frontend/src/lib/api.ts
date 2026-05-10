@@ -172,6 +172,12 @@ export async function syncKalshiBets(reset = false): Promise<{ imported: number;
 
 export interface KalshiBalance { cash: number; portfolio_value: number; }
 
+export async function resolveOutcomes(): Promise<{ resolved: number }> {
+  const res = await fetch(`${BASE}/api/bets/resolve-outcomes`, { method: 'POST' });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
 export async function getKalshiBalance(): Promise<KalshiBalance | null> {
   try {
     return await get<KalshiBalance>('/api/bets/kalshi-balance');
