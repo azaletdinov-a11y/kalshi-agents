@@ -3,26 +3,37 @@ import { getMarket, placeOrder, getPortfolioBalance } from '../lib/kalshi';
 
 export interface AutoBetSettings {
   enabled: boolean;
-  maxPerBet: number;   // $ max per single bet
-  minEdge: number;     // minimum edge (0–1)
-  dryRun: boolean;     // log only, don't place real orders
+  maxPerBet: number;
+  minEdge: number;
+  minPrice: number;  // min ask price in cents (e.g. 30)
+  maxPrice: number;  // max ask price in cents (e.g. 75)
+  maxDays: number;   // max days to close_time
+  dryRun: boolean;
 }
 
+const MAX_CONCURRENT = 3;
+
 export async function getAutoBetSettings(): Promise<AutoBetSettings> {
-  const result = await db.query(`SELECT key, value FROM settings WHERE key IN ('auto_bet_enabled','auto_bet_max_per_bet','auto_bet_min_edge','auto_bet_dry_run')`);
-  const map = Object.fromEntries(result.rows.map((r: { key: string; value: string }) => [r.key, r.value]));
+  const result = await db.query(`
+    SELECT key, value FROM settings
+    WHERE key IN ('auto_bet_enabled','auto_bet_max_per_bet','auto_bet_min_edge',
+                  'auto_bet_dry_run','auto_bet_min_price','auto_bet_max_price','auto_bet_max_days')
+  `);
+  const m = Object.fromEntries(result.rows.map((r: { key: string; value: string }) => [r.key, r.value]));
   return {
-    enabled: map['auto_bet_enabled'] === 'true',
-    maxPerBet: parseFloat(map['auto_bet_max_per_bet'] ?? '2'),
-    minEdge: parseFloat(map['auto_bet_min_edge'] ?? '0.15'),
-    dryRun: map['auto_bet_dry_run'] !== 'false',  // dry run by default until user disables
+    enabled:    m['auto_bet_enabled'] === 'true',
+    maxPerBet:  parseFloat(m['auto_bet_max_per_bet'] ?? '3'),
+    minEdge:    parseFloat(m['auto_bet_min_edge'] ?? '0.20'),
+    minPrice:   parseInt(m['auto_bet_min_price'] ?? '30'),
+    maxPrice:   parseInt(m['auto_bet_max_price'] ?? '75'),
+    maxDays:    parseInt(m['auto_bet_max_days'] ?? '30'),
+    dryRun:     m['auto_bet_dry_run'] !== 'false',
   };
 }
 
-// Returns dollar amount to bet given Kelly fraction, bankroll, and caps
 function computeBetSize(kellyFraction: number, bankroll: number, maxPerBet: number): number {
   const kelly = Math.max(0, kellyFraction) * bankroll;
-  return Math.min(kelly, maxPerBet, bankroll * 0.25); // never more than 25% of bankroll
+  return Math.min(kelly, maxPerBet, bankroll * 0.25);
 }
 
 export async function runAutoBettor(): Promise<{ placed: number; skipped: number; errors: string[] }> {
@@ -33,32 +44,35 @@ export async function runAutoBettor(): Promise<{ placed: number; skipped: number
   const bankroll = balance.cash;
 
   if (bankroll < 0.50) {
-    console.log('[AutoBet] Skipping — Kalshi cash balance too low:', bankroll);
+    console.log('[AutoBet] Skipping — cash too low:', bankroll);
     return { placed: 0, skipped: 0, errors: [] };
   }
 
-  // Count active auto-bets to enforce max-concurrent limit
-  const activeCount = await db.query(`SELECT COUNT(*) FROM bets WHERE outcome = 'pending' AND kalshi_fill_id LIKE 'auto:%'`);
-  if (Number(activeCount.rows[0].count) >= 5) {
-    console.log('[AutoBet] Skipping — 5 active auto-bets already open');
+  const activeCount = await db.query(
+    `SELECT COUNT(*) FROM bets WHERE outcome = 'pending' AND kalshi_fill_id LIKE 'auto:%'`
+  );
+  if (Number(activeCount.rows[0].count) >= MAX_CONCURRENT) {
+    console.log(`[AutoBet] Skipping — ${MAX_CONCURRENT} active auto-bets already open`);
     return { placed: 0, skipped: 0, errors: [] };
   }
 
-  // Fetch high-confidence pending recommendations not already bet
   const recs = await db.query(`
     SELECT r.id, r.market_ticker, r.market_title, r.side, r.edge, r.kelly_fraction,
-           r.market_yes_price, r.estimated_probability, r.close_time
+           r.market_yes_price, r.estimated_probability, r.close_time, r.category
     FROM recommendations r
     WHERE r.outcome = 'pending'
       AND r.confidence = 'high'
       AND r.edge >= $1
+      AND r.category != 'Other'
+      AND r.market_yes_price BETWEEN $2 AND $3
       AND r.close_time > NOW() + INTERVAL '24 hours'
+      AND r.close_time <= NOW() + ($4 * INTERVAL '1 day')
       AND NOT EXISTS (
         SELECT 1 FROM bets b WHERE b.market_ticker = r.market_ticker AND b.outcome = 'pending'
       )
     ORDER BY r.edge DESC
-    LIMIT 5
-  `, [settings.minEdge]);
+    LIMIT $5
+  `, [settings.minEdge, settings.minPrice, settings.maxPrice, settings.maxDays, MAX_CONCURRENT]);
 
   let placed = 0;
   let skipped = 0;
@@ -68,7 +82,7 @@ export async function runAutoBettor(): Promise<{ placed: number; skipped: number
   for (const rec of recs.rows) {
     const betAmount = computeBetSize(Number(rec.kelly_fraction), bankroll, settings.maxPerBet);
     if (betAmount < 0.10) { skipped++; continue; }
-    if (betAmount > remainingCash * 0.5) { skipped++; continue; } // don't spend >50% remaining in one shot
+    if (betAmount > remainingCash * 0.5) { skipped++; continue; }
 
     try {
       const market = await getMarket(rec.market_ticker as string);
@@ -76,7 +90,12 @@ export async function runAutoBettor(): Promise<{ placed: number; skipped: number
         ? Math.round(parseFloat(market.yes_ask_dollars ?? '0') * 100)
         : Math.round(parseFloat(market.no_ask_dollars ?? '0') * 100);
 
-      if (askPrice <= 0 || askPrice >= 100) { skipped++; continue; }
+      // Re-check price range against live ask (market may have moved)
+      if (askPrice < settings.minPrice || askPrice > settings.maxPrice) {
+        console.log(`[AutoBet] Skip ${rec.market_ticker} — live ask ${askPrice}¢ outside range`);
+        skipped++;
+        continue;
+      }
 
       const count = Math.floor(betAmount / (askPrice / 100));
       if (count < 1) { skipped++; continue; }
@@ -84,7 +103,7 @@ export async function runAutoBettor(): Promise<{ placed: number; skipped: number
       const actualAmount = Math.round(count * (askPrice / 100) * 100) / 100;
 
       if (settings.dryRun) {
-        console.log(`[AutoBet] DRY RUN: ${rec.market_ticker} ${String(rec.side).toUpperCase()} ${count} contracts @ ${askPrice}¢ = $${actualAmount}`);
+        console.log(`[AutoBet] DRY RUN: ${rec.market_ticker} ${String(rec.side).toUpperCase()} ${count} @ ${askPrice}¢ = $${actualAmount} (edge=${(Number(rec.edge)*100).toFixed(1)}% cat=${rec.category})`);
         placed++;
         remainingCash -= actualAmount;
         continue;

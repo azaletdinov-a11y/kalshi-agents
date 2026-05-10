@@ -7,6 +7,9 @@ interface Settings {
   enabled: boolean;
   max_per_bet: number;
   min_edge: number;
+  min_price: number;
+  max_price: number;
+  max_days: number;
   dry_run: boolean;
 }
 
@@ -27,6 +30,9 @@ export function AutoBetSettings({ initial }: { initial: Settings }) {
         enabled: next.enabled,
         max_per_bet: next.max_per_bet,
         min_edge: next.min_edge,
+        min_price: next.min_price,
+        max_price: next.max_price,
+        max_days: next.max_days,
         dry_run: next.dry_run,
       }),
     });
@@ -55,7 +61,7 @@ export function AutoBetSettings({ initial }: { initial: Settings }) {
         <div>
           <label className="text-xs text-slate-500 block mb-1">Max per bet ($)</label>
           <input
-            type="number" min="0.5" max="10" step="0.5"
+            type="number" min="0.5" max="20" step="0.5"
             value={s.max_per_bet}
             onChange={(e) => setS({ ...s, max_per_bet: parseFloat(e.target.value) })}
             onBlur={() => save({ max_per_bet: s.max_per_bet })}
@@ -69,6 +75,36 @@ export function AutoBetSettings({ initial }: { initial: Settings }) {
             value={Math.round(s.min_edge * 100)}
             onChange={(e) => setS({ ...s, min_edge: parseFloat(e.target.value) / 100 })}
             onBlur={() => save({ min_edge: s.min_edge })}
+            className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white"
+          />
+        </div>
+        <div>
+          <label className="text-xs text-slate-500 block mb-1">Min ask price (¢)</label>
+          <input
+            type="number" min="5" max="50" step="1"
+            value={s.min_price}
+            onChange={(e) => setS({ ...s, min_price: parseInt(e.target.value) })}
+            onBlur={() => save({ min_price: s.min_price })}
+            className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white"
+          />
+        </div>
+        <div>
+          <label className="text-xs text-slate-500 block mb-1">Max ask price (¢)</label>
+          <input
+            type="number" min="50" max="95" step="1"
+            value={s.max_price}
+            onChange={(e) => setS({ ...s, max_price: parseInt(e.target.value) })}
+            onBlur={() => save({ max_price: s.max_price })}
+            className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white"
+          />
+        </div>
+        <div>
+          <label className="text-xs text-slate-500 block mb-1">Max days to close</label>
+          <input
+            type="number" min="1" max="90" step="1"
+            value={s.max_days}
+            onChange={(e) => setS({ ...s, max_days: parseInt(e.target.value) })}
+            onBlur={() => save({ max_days: s.max_days })}
             className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white"
           />
         </div>

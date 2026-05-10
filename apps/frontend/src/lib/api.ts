@@ -178,7 +178,7 @@ export async function resolveOutcomes(): Promise<{ resolved: number }> {
   return res.json();
 }
 
-export interface AutoBetSettings { enabled: boolean; max_per_bet: number; min_edge: number; dry_run: boolean; }
+export interface AutoBetSettings { enabled: boolean; max_per_bet: number; min_edge: number; min_price: number; max_price: number; max_days: number; dry_run: boolean; }
 
 export async function getAutoBetSettings(): Promise<AutoBetSettings> {
   return get<AutoBetSettings>('/api/settings/auto-bet');

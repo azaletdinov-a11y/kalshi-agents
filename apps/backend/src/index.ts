@@ -95,8 +95,11 @@ ALTER TABLE bets ADD COLUMN IF NOT EXISTS kalshi_fill_id TEXT UNIQUE;
 DELETE FROM bets WHERE fill_price::text = 'NaN' OR amount::text = 'NaN';
 INSERT INTO settings (key, value) VALUES
   ('auto_bet_enabled', 'false'),
-  ('auto_bet_max_per_bet', '2'),
-  ('auto_bet_min_edge', '0.15'),
+  ('auto_bet_max_per_bet', '3'),
+  ('auto_bet_min_edge', '0.20'),
+  ('auto_bet_min_price', '30'),
+  ('auto_bet_max_price', '75'),
+  ('auto_bet_max_days', '30'),
   ('auto_bet_dry_run', 'true')
 ON CONFLICT (key) DO NOTHING;
 `;

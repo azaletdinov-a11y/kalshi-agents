@@ -28,23 +28,29 @@ router.patch('/bankroll', async (req, res) => {
 });
 
 router.get('/auto-bet', async (_req, res) => {
-  const result = await db.query(`SELECT key, value FROM settings WHERE key IN ('auto_bet_enabled','auto_bet_max_per_bet','auto_bet_min_edge','auto_bet_dry_run')`);
+  const result = await db.query(`SELECT key, value FROM settings WHERE key IN ('auto_bet_enabled','auto_bet_max_per_bet','auto_bet_min_edge','auto_bet_min_price','auto_bet_max_price','auto_bet_max_days','auto_bet_dry_run')`);
   const map = Object.fromEntries(result.rows.map((r: { key: string; value: string }) => [r.key, r.value]));
   res.json({
-    enabled: map['auto_bet_enabled'] === 'true',
-    max_per_bet: parseFloat(map['auto_bet_max_per_bet'] ?? '2'),
-    min_edge: parseFloat(map['auto_bet_min_edge'] ?? '0.15'),
-    dry_run: map['auto_bet_dry_run'] !== 'false',
+    enabled:   map['auto_bet_enabled'] === 'true',
+    max_per_bet: parseFloat(map['auto_bet_max_per_bet'] ?? '3'),
+    min_edge:  parseFloat(map['auto_bet_min_edge'] ?? '0.20'),
+    min_price: parseInt(map['auto_bet_min_price'] ?? '30'),
+    max_price: parseInt(map['auto_bet_max_price'] ?? '75'),
+    max_days:  parseInt(map['auto_bet_max_days'] ?? '30'),
+    dry_run:   map['auto_bet_dry_run'] !== 'false',
   });
 });
 
 router.patch('/auto-bet', async (req, res) => {
-  const { enabled, max_per_bet, min_edge, dry_run } = req.body;
+  const { enabled, max_per_bet, min_edge, min_price, max_price, max_days, dry_run } = req.body;
   const updates: [string, string][] = [];
-  if (enabled !== undefined) updates.push(['auto_bet_enabled', String(enabled)]);
+  if (enabled !== undefined)    updates.push(['auto_bet_enabled', String(enabled)]);
   if (max_per_bet !== undefined) updates.push(['auto_bet_max_per_bet', String(max_per_bet)]);
-  if (min_edge !== undefined) updates.push(['auto_bet_min_edge', String(min_edge)]);
-  if (dry_run !== undefined) updates.push(['auto_bet_dry_run', String(dry_run)]);
+  if (min_edge !== undefined)   updates.push(['auto_bet_min_edge', String(min_edge)]);
+  if (min_price !== undefined)  updates.push(['auto_bet_min_price', String(min_price)]);
+  if (max_price !== undefined)  updates.push(['auto_bet_max_price', String(max_price)]);
+  if (max_days !== undefined)   updates.push(['auto_bet_max_days', String(max_days)]);
+  if (dry_run !== undefined)    updates.push(['auto_bet_dry_run', String(dry_run)]);
   for (const [key, value] of updates) {
     await db.query(`INSERT INTO settings (key, value) VALUES ($1,$2) ON CONFLICT (key) DO UPDATE SET value=$2`, [key, value]);
   }
