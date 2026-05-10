@@ -303,6 +303,7 @@ router.post('/sync-kalshi', async (req, res) => {
       imported++;
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[Bets] Failed to import ${entry.ticker} (${entry.key}): ${msg}`, { fillPrice: entry.fillPrice, amount: entry.amount });
       errors.push(`${entry.ticker}: ${msg}`);
     }
   }
