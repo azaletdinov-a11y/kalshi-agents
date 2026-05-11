@@ -87,6 +87,8 @@ CREATE INDEX IF NOT EXISTS idx_recommendations_outcome ON recommendations(outcom
 CREATE INDEX IF NOT EXISTS idx_pipeline_runs_started_at ON pipeline_runs(started_at DESC);
 CREATE INDEX IF NOT EXISTS idx_bets_outcome ON bets(outcome);
 CREATE INDEX IF NOT EXISTS idx_bets_close_time ON bets(close_time);
+CREATE INDEX IF NOT EXISTS idx_bets_kalshi_fill_id ON bets(kalshi_fill_id);
+CREATE INDEX IF NOT EXISTS idx_bets_outcome_fill ON bets(outcome, kalshi_fill_id) WHERE kalshi_fill_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS market_snapshots (
   id SERIAL PRIMARY KEY,

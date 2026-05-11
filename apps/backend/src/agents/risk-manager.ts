@@ -15,18 +15,22 @@ function kellyFraction(p: number, price: number): number {
   return (p * b - (1 - p)) / b;
 }
 
-export async function evaluateAndStore(
-  market: KalshiMarketRaw,
-  estimation: EstimationResult,
-  research: ResearchResult
-): Promise<boolean> {
-  // Fetch live bankroll: starting bankroll + realized P&L from actual bets
+export async function fetchBankroll(): Promise<number> {
   const [bankrollSetting, realizedPnl] = await Promise.all([
     db.query(`SELECT value FROM settings WHERE key='starting_bankroll'`),
     db.query(`SELECT COALESCE(SUM(pnl), 0) AS pnl FROM bets WHERE outcome IN ('won','lost')`),
   ]);
-  const startingBankroll = Number(bankrollSetting.rows[0]?.value ?? process.env.BANKROLL ?? 100);
-  const BANKROLL = Math.max(10, startingBankroll + Number(realizedPnl.rows[0].pnl));
+  const starting = Number(bankrollSetting.rows[0]?.value ?? process.env.BANKROLL ?? 100);
+  return Math.max(10, starting + Number(realizedPnl.rows[0].pnl));
+}
+
+export async function evaluateAndStore(
+  market: KalshiMarketRaw,
+  estimation: EstimationResult,
+  research: ResearchResult,
+  bankroll: number
+): Promise<boolean> {
+  const BANKROLL = bankroll;
 
   const marketP = estimation.marketYesPrice / 100;
   const ourP = estimation.estimated_probability / 100;

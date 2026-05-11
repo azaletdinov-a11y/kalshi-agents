@@ -62,7 +62,7 @@ export async function runAutoBettor(): Promise<{ placed: number; skipped: number
     FROM recommendations r
     WHERE r.outcome = 'pending'
       AND r.confidence = 'high'
-      AND r.edge >= $1
+      AND r.edge >= $1 * 100
       AND r.category != 'Other'
       AND r.market_yes_price BETWEEN $2 AND $3
       AND r.close_time > NOW() + INTERVAL '24 hours'

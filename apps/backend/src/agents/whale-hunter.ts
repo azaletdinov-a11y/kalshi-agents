@@ -226,7 +226,7 @@ async function persistNewEvents(): Promise<number> {
     if (a.oi_delta > 0 && a.oi_spike_ratio != null && a.oi_spike_ratio >= 3) signals.push('open-interest');
     if (a.momentum_move != null)                                            signals.push('momentum');
     if (a.rec_side != null)                                                 signals.push('ai-match');
-    if (signals.length === 0)                                               signals.push('volume');
+    if (signals.length === 0)                                               signals.push('other');
 
     const res = await db.query(
       `INSERT INTO whale_events

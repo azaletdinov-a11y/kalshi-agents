@@ -2,7 +2,7 @@ import { db } from '../db/client';
 import { scanMarkets } from './market-scanner';
 import { researchMarket } from './researcher';
 import { estimateMarket } from './estimator';
-import { evaluateAndStore } from './risk-manager';
+import { evaluateAndStore, fetchBankroll } from './risk-manager';
 import { runAutoBettor } from './auto-bettor';
 
 let isRunning = false;
@@ -35,11 +35,14 @@ export async function runPipeline(): Promise<{ marketsScanned: number; recommend
     const markets = await scanMarkets();
     marketsScanned = markets.length;
 
+    const bankroll = await fetchBankroll();
+    console.log(`[Pipeline] Bankroll: $${bankroll.toFixed(2)}`);
+
     for (const market of markets) {
       try {
         const research = await researchMarket(market);
         const estimation = await estimateMarket(market, research);
-        const stored = await evaluateAndStore(market, estimation, research);
+        const stored = await evaluateAndStore(market, estimation, research, bankroll);
         if (stored) recommendationsGenerated++;
 
         // Avoid hammering Claude API — small delay between markets
