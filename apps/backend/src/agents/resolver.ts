@@ -21,6 +21,11 @@ export async function resolveSettledMarkets(): Promise<number> {
       if (!isSettled) continue;
 
       const result = market.result?.toLowerCase();
+      if (!result) {
+        console.warn(`[Resolver] ${rec.market_ticker}: finalized but no result field — skipping`);
+        continue;
+      }
+
       const outcome = result === rec.side ? 'won' : 'lost';
 
       await db.query(
@@ -87,6 +92,11 @@ export async function resolveSettledMarkets(): Promise<number> {
         if (!isSettled) continue;
 
         const result = market.result?.toLowerCase();
+        if (!result) {
+          console.warn(`[Resolver] ${ticker}: finalized but no result field — skipping`);
+          continue;
+        }
+
         for (const bet of bets) {
           const betOutcome = result === bet.side ? 'won' : 'lost';
           const amount = Number(bet.amount);

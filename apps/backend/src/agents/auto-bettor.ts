@@ -103,7 +103,7 @@ export async function runAutoBettor(): Promise<{ placed: number; skipped: number
       const actualAmount = Math.round(count * (askPrice / 100) * 100) / 100;
 
       if (settings.dryRun) {
-        console.log(`[AutoBet] DRY RUN: ${rec.market_ticker} ${String(rec.side).toUpperCase()} ${count} @ ${askPrice}¢ = $${actualAmount} (edge=${(Number(rec.edge)*100).toFixed(1)}% cat=${rec.category})`);
+        console.log(`[AutoBet] DRY RUN: ${rec.market_ticker} ${String(rec.side).toUpperCase()} ${count} @ ${askPrice}¢ = $${actualAmount} (edge=${Number(rec.edge).toFixed(1)}% cat=${rec.category})`);
         placed++;
         remainingCash -= actualAmount;
         continue;

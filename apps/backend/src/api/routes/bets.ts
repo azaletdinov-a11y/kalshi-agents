@@ -278,8 +278,8 @@ async function resolveOutcomes(): Promise<number> {
         [outcome, pnl, bet.id]
       );
       resolved++;
-    } catch {
-      // skip markets that fail to fetch
+    } catch (err) {
+      console.error(`[Bets] resolveOutcomes failed for ${bet.market_ticker as string}:`, err instanceof Error ? err.message : err);
     }
   }
   return resolved;

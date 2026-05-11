@@ -114,7 +114,7 @@ export async function getWhaleAlerts(minAbsVol = 50, minPriceDelta = 8, spikeMul
       SELECT DISTINCT ON (market_ticker)
         market_ticker,
         side,
-        ROUND(edge::numeric * 100, 1) AS edge_pct,
+        ROUND(edge::numeric, 1) AS edge_pct,
         confidence
       FROM recommendations
       WHERE outcome = 'pending'
@@ -123,9 +123,9 @@ export async function getWhaleAlerts(minAbsVol = 50, minPriceDelta = 8, spikeMul
     ),
     latest AS (
       SELECT DISTINCT ON (ticker)
-        ticker, title, category, yes_price, vol_interval, price_interval, captured_at
+        ticker, title, category, yes_price, vol_interval, oi_interval, price_interval, captured_at
       FROM intervals
-      WHERE vol_interval IS NOT NULL OR price_interval IS NOT NULL
+      WHERE vol_interval IS NOT NULL OR oi_interval IS NOT NULL OR price_interval IS NOT NULL
       ORDER BY ticker, captured_at DESC
     )
     SELECT
