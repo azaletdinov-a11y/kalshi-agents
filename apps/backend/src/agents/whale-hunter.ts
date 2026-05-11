@@ -1,8 +1,8 @@
 import { getOpenMarkets, parsePrice } from '../lib/kalshi';
 import { inferCategory } from './market-scanner';
 import { db } from '../db/client';
+import { sendWhaleAlertEmail } from '../lib/email';
 
-// Fetch ALL open markets every sweep for full coverage (Iran-style events live in obscure tickers)
 const SNAPSHOT_LIMIT = 5000;
 
 export async function snapshotMarkets(): Promise<number> {
@@ -13,8 +13,8 @@ export async function snapshotMarkets(): Promise<number> {
   const titles: string[]   = [];
   const cats: string[]     = [];
   const prices: number[]   = [];
-  const volAll: number[]   = [];  // volume_fp: all-time cumulative, monotonically increasing
-  const vol24h: number[]   = [];  // volume_24h_fp: kept for reference only
+  const volAll: number[]   = [];
+  const vol24h: number[]   = [];
 
   for (const m of markets) {
     const yesPrice = parsePrice(m.yes_ask_dollars) || (100 - parsePrice(m.no_bid_dollars));
@@ -43,7 +43,7 @@ export async function snapshotMarkets(): Promise<number> {
   return tickers.length;
 }
 
-// ─── Detection ───────────────────────────────────────────────────────────────
+// ─── Detection ────────────────────────────────────────────────────────────────
 
 export interface WhaleAlert {
   ticker: string;
@@ -52,11 +52,15 @@ export interface WhaleAlert {
   yes_price: number;
   prev_price: number;
   price_delta: number;
-  vol_delta: number;       // contracts traded since last snapshot
-  vol_delta_usd: number;   // estimated $ value
-  baseline_avg: number;    // average contracts/interval over last 24h
-  spike_ratio: number | null; // vol_delta / baseline_avg (null if insufficient history)
-  readings: number;        // how many baseline data points we have
+  vol_delta: number;
+  vol_delta_usd: number;
+  baseline_avg: number;
+  spike_ratio: number | null;
+  readings: number;
+  momentum_move: number | null;   // cumulative ¢ move over last 4h (null = no momentum)
+  rec_side: string | null;        // 'yes'|'no' if a pending high/med rec exists
+  rec_edge: number | null;        // edge % of that rec
+  rec_confidence: string | null;
   captured_at: string;
 }
 
@@ -83,6 +87,29 @@ export async function getWhaleAlerts(minAbsVol = 50, minPriceDelta = 8): Promise
         AND captured_at < NOW() - INTERVAL '25 minutes'
       GROUP BY ticker
     ),
+    momentum AS (
+      -- Markets with 3+ consecutive intervals all moving the same direction (≥2¢ each)
+      SELECT
+        ticker,
+        SUM(COALESCE(price_interval, 0)) AS cumulative_move
+      FROM intervals
+      WHERE captured_at >= NOW() - INTERVAL '4 hours'
+        AND price_interval IS NOT NULL
+      GROUP BY ticker
+      HAVING COUNT(*) FILTER (WHERE price_interval >  2) >= 3
+          OR COUNT(*) FILTER (WHERE price_interval < -2) >= 3
+    ),
+    recs AS (
+      SELECT DISTINCT ON (market_ticker)
+        market_ticker,
+        side,
+        ROUND(edge::numeric * 100, 1) AS edge_pct,
+        confidence
+      FROM recommendations
+      WHERE outcome = 'pending'
+        AND confidence IN ('high', 'medium')
+      ORDER BY market_ticker, edge DESC
+    ),
     latest AS (
       SELECT DISTINCT ON (ticker)
         ticker, title, category, yes_price, vol_interval, price_interval, captured_at
@@ -103,22 +130,27 @@ export async function getWhaleAlerts(minAbsVol = 50, minPriceDelta = 8): Promise
            THEN ROUND(l.vol_interval::numeric / b.avg_vol, 1)
            ELSE NULL
       END                                                      AS spike_ratio,
+      m.cumulative_move                                        AS momentum_move,
+      r.side                                                   AS rec_side,
+      r.edge_pct                                               AS rec_edge,
+      r.confidence                                             AS rec_confidence,
       l.captured_at
     FROM latest l
     LEFT JOIN baseline b ON l.ticker = b.ticker
+    LEFT JOIN momentum m ON l.ticker = m.ticker
+    LEFT JOIN recs    r ON l.ticker = r.market_ticker
     WHERE (
-      -- Normalized spike: current interval is 3× the market's baseline activity
       (COALESCE(l.vol_interval, 0) > 0
         AND COALESCE(b.avg_vol, 0) > 1
         AND l.vol_interval > 3 * b.avg_vol
         AND l.vol_interval >= 10)
-      -- Fallback absolute threshold for markets we've just started tracking
       OR (COALESCE(l.vol_interval, 0) >= $1
         AND COALESCE(b.active_readings, 0) < 5)
-      -- Price spike (informed money moving the book)
       OR ABS(COALESCE(l.price_interval, 0)) >= $2
+      OR m.ticker IS NOT NULL
     )
     ORDER BY
+      (r.side IS NOT NULL)::int DESC,
       CASE WHEN COALESCE(b.avg_vol, 0) > 1
            THEN l.vol_interval::float / b.avg_vol ELSE 0 END DESC,
       COALESCE(l.vol_interval, 0) DESC
@@ -126,18 +158,22 @@ export async function getWhaleAlerts(minAbsVol = 50, minPriceDelta = 8): Promise
   `, [minAbsVol, minPriceDelta]);
 
   return result.rows.map((r) => ({
-    ticker:       r.ticker,
-    title:        r.title,
-    category:     r.category,
-    yes_price:    Number(r.yes_price),
-    prev_price:   Number(r.prev_price),
-    price_delta:  Number(r.price_delta),
-    vol_delta:    Number(r.vol_delta),
-    vol_delta_usd: Number(r.vol_delta_usd),
-    baseline_avg: Number(r.baseline_avg),
-    spike_ratio:  r.spike_ratio != null ? Number(r.spike_ratio) : null,
-    readings:     Number(r.readings),
-    captured_at:  r.captured_at,
+    ticker:          r.ticker,
+    title:           r.title,
+    category:        r.category,
+    yes_price:       Number(r.yes_price),
+    prev_price:      Number(r.prev_price),
+    price_delta:     Number(r.price_delta),
+    vol_delta:       Number(r.vol_delta),
+    vol_delta_usd:   Number(r.vol_delta_usd),
+    baseline_avg:    Number(r.baseline_avg),
+    spike_ratio:     r.spike_ratio    != null ? Number(r.spike_ratio)    : null,
+    readings:        Number(r.readings),
+    momentum_move:   r.momentum_move  != null ? Number(r.momentum_move)  : null,
+    rec_side:        r.rec_side       ?? null,
+    rec_edge:        r.rec_edge       != null ? Number(r.rec_edge)       : null,
+    rec_confidence:  r.rec_confidence ?? null,
+    captured_at:     r.captured_at,
   }));
 }
 
@@ -165,8 +201,10 @@ async function persistNewEvents(): Promise<number> {
   for (const a of alerts) {
     const signals: string[] = [];
     if (a.vol_delta > 0 && (a.spike_ratio == null || a.spike_ratio >= 3)) signals.push('volume');
-    if (Math.abs(a.price_delta) >= 8) signals.push('price');
-    if (signals.length === 0) signals.push('volume');
+    if (Math.abs(a.price_delta) >= 8)   signals.push('price');
+    if (a.momentum_move != null)         signals.push('momentum');
+    if (a.rec_side != null)              signals.push('ai-match');
+    if (signals.length === 0)            signals.push('volume');
 
     const res = await db.query(
       `INSERT INTO whale_events
@@ -175,16 +213,29 @@ async function persistNewEvents(): Promise<number> {
        SELECT $1,$2,$3,$4,$5,$6,$7,$8,$9,$10
        WHERE NOT EXISTS (
          SELECT 1 FROM whale_events
-         WHERE ticker = $1
-           AND detected_at >= NOW() - INTERVAL '30 minutes'
+         WHERE ticker = $1 AND detected_at >= NOW() - INTERVAL '30 minutes'
        )`,
       [a.ticker, a.title, a.category, a.yes_price, a.prev_price, a.price_delta,
        a.vol_delta, a.vol_delta_usd, a.spike_ratio, signals]
     );
-    if ((res.rowCount ?? 0) > 0) count++;
+
+    const isNew = (res.rowCount ?? 0) > 0;
+    if (isNew) {
+      count++;
+      // Email for high-conviction events: 5× baseline spike, or AI match, or momentum+price together
+      const isHighConviction =
+        (a.spike_ratio != null && a.spike_ratio >= 5) ||
+        a.rec_side != null ||
+        (a.momentum_move != null && Math.abs(a.price_delta) >= 8);
+
+      if (isHighConviction) {
+        sendWhaleAlertEmail(a, signals).catch((err) =>
+          console.error('[WhaleHunter] Email failed:', err)
+        );
+      }
+    }
   }
 
-  // Retain 7 days of history
   await db.query(`DELETE FROM whale_events WHERE detected_at < NOW() - INTERVAL '7 days'`);
   return count;
 }
