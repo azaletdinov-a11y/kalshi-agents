@@ -1,5 +1,6 @@
 import { db } from '../db/client';
 import { getMarket, placeOrder, getPortfolioBalance } from '../lib/kalshi';
+import { fetchBankroll } from './risk-manager';
 
 export interface AutoBetSettings {
   enabled: boolean;
@@ -40,12 +41,18 @@ export async function runAutoBettor(): Promise<{ placed: number; skipped: number
   const settings = await getAutoBetSettings();
   if (!settings.enabled) return { placed: 0, skipped: 0, errors: [] };
 
-  const balance = await getPortfolioBalance();
-  const bankroll = balance.cash;
-
-  if (bankroll < 0.50) {
-    console.log('[AutoBet] Skipping — cash too low:', bankroll);
-    return { placed: 0, skipped: 0, errors: [] };
+  // In dry-run mode use DB-computed bankroll — avoids dependency on Kalshi auth.
+  // In real mode use live Kalshi cash so we never over-commit.
+  let bankroll: number;
+  if (settings.dryRun) {
+    bankroll = await fetchBankroll();
+  } else {
+    const balance = await getPortfolioBalance();
+    bankroll = balance.cash;
+    if (bankroll < 0.50) {
+      console.log('[AutoBet] Skipping — cash too low:', bankroll);
+      return { placed: 0, skipped: 0, errors: [] };
+    }
   }
 
   const activeCount = await db.query(
@@ -103,7 +110,14 @@ export async function runAutoBettor(): Promise<{ placed: number; skipped: number
       const actualAmount = Math.round(count * (askPrice / 100) * 100) / 100;
 
       if (settings.dryRun) {
-        console.log(`[AutoBet] DRY RUN: ${rec.market_ticker} ${String(rec.side).toUpperCase()} ${count} @ ${askPrice}¢ = $${actualAmount} (edge=${Number(rec.edge).toFixed(1)}% cat=${rec.category})`);
+        // Persist simulated bet so resolver can track outcomes and P&L over time.
+        // kalshi_fill_id is NULL (no real order); distinguishable via auto_placed=TRUE + NULL fill_id.
+        await db.query(
+          `INSERT INTO bets (recommendation_id, market_ticker, market_title, side, fill_price, amount, close_time, placed_at, auto_placed)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,NOW(),TRUE)`,
+          [rec.id, rec.market_ticker, rec.market_title, rec.side, askPrice, actualAmount, rec.close_time]
+        );
+        console.log(`[AutoBet] DRY RUN saved: ${rec.market_ticker} ${String(rec.side).toUpperCase()} ${count} @ ${askPrice}¢ = $${actualAmount} (edge=${Number(rec.edge).toFixed(1)}% cat=${rec.category})`);
         placed++;
         remainingCash -= actualAmount;
         continue;
