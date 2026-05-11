@@ -15,10 +15,11 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 
 const SIGNAL_STYLES: Record<string, string> = {
-  volume:    'bg-amber-900/60 text-amber-300',
-  price:     'bg-emerald-900/60 text-emerald-300',
-  momentum:  'bg-orange-900/60 text-orange-300',
-  'ai-match': 'bg-violet-900/60 text-violet-300',
+  volume:          'bg-amber-900/60 text-amber-300',
+  price:           'bg-emerald-900/60 text-emerald-300',
+  'open-interest': 'bg-teal-900/60 text-teal-300',
+  momentum:        'bg-orange-900/60 text-orange-300',
+  'ai-match':      'bg-violet-900/60 text-violet-300',
 };
 
 function CategoryBadge({ cat }: { cat: string }) {
@@ -26,10 +27,14 @@ function CategoryBadge({ cat }: { cat: string }) {
   return <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${cls}`}>{cat}</span>;
 }
 
+const SIGNAL_LABELS: Record<string, string> = {
+  'ai-match':      'AI ✓',
+  'open-interest': 'OI spike',
+};
+
 function SignalTag({ label }: { label: string }) {
   const cls = SIGNAL_STYLES[label] ?? 'bg-slate-700/60 text-slate-300';
-  const display = label === 'ai-match' ? 'AI ✓' : label;
-  return <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${cls}`}>{display}</span>;
+  return <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${cls}`}>{SIGNAL_LABELS[label] ?? label}</span>;
 }
 
 function AlertRow({ a }: { a: WhaleAlert }) {
@@ -41,10 +46,11 @@ function AlertRow({ a }: { a: WhaleAlert }) {
 
   const signals: string[] = [];
   if (a.vol_delta > 0 && (a.spike_ratio == null || a.spike_ratio >= 3)) signals.push('volume');
-  if (Math.abs(a.price_delta) >= 8)  signals.push('price');
-  if (hasMomentum)                    signals.push('momentum');
-  if (hasRec)                         signals.push('ai-match');
-  if (signals.length === 0)           signals.push('volume');
+  if (Math.abs(a.price_delta) >= 8)                                       signals.push('price');
+  if (a.oi_delta > 0 && a.oi_spike_ratio != null && a.oi_spike_ratio >= 3) signals.push('open-interest');
+  if (hasMomentum)                                                          signals.push('momentum');
+  if (hasRec)                                                               signals.push('ai-match');
+  if (signals.length === 0)                                                 signals.push('volume');
 
   return (
     <tr className={`transition-colors ${rowBg}`}>
@@ -81,10 +87,15 @@ function AlertRow({ a }: { a: WhaleAlert }) {
             <span className="text-amber-400 font-semibold">+{a.vol_delta.toLocaleString()}</span>
             <span className="text-slate-500 text-xs ml-1">(~${a.vol_delta_usd.toLocaleString()})</span>
             {a.spike_ratio != null && a.spike_ratio >= 3 && (
-              <div className="text-xs text-amber-300 font-bold">{a.spike_ratio}× baseline</div>
+              <div className="text-xs text-amber-300 font-bold">{a.spike_ratio}× vol</div>
             )}
           </div>
         ) : <span className="text-slate-600">—</span>}
+        {a.oi_delta > 0 && a.oi_spike_ratio != null && a.oi_spike_ratio >= 3 && (
+          <div className="text-teal-400 text-xs mt-0.5">
+            +{a.oi_delta.toLocaleString()} OI <span className="text-teal-300 font-bold">{a.oi_spike_ratio}×</span>
+          </div>
+        )}
       </td>
       <td className="px-4 py-3">
         {hasRec && (
@@ -266,6 +277,7 @@ export default async function WhalesPage() {
         <div><span className="text-amber-300 font-semibold">volume</span> — contracts spiked 3× above this market's 24h baseline. Ratio shown (e.g. 12×).</div>
         <div><span className="text-emerald-300 font-semibold">price</span> — ask price moved ≥8¢ in the last snapshot window.</div>
         <div><span className="text-orange-300 font-semibold">momentum</span> — price moved same direction for 3+ consecutive intervals over the last 4 hours. Stronger conviction than a single-snapshot spike.</div>
+        <div><span className="text-teal-300 font-semibold">OI spike</span> — open interest jumped 3× baseline. New contracts being created = new money entering, not just existing holders trading with each other. Volume spike alone could be recycling; volume + OI together means real position buildup.</div>
         <div><span className="text-violet-300 font-semibold">AI ✓</span> — your AI has a pending high/medium confidence recommendation on this market. Whale + AI agreeing is the strongest signal.</div>
         <div className="text-slate-600 pt-1">Email alerts fire for spike_ratio ≥5×, AI matches, or momentum+price together. Set RESEND_API_KEY + ALERT_EMAIL in Railway to enable.</div>
       </div>

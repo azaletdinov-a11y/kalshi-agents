@@ -15,6 +15,7 @@ export async function snapshotMarkets(): Promise<number> {
   const prices: number[]   = [];
   const volAll: number[]   = [];
   const vol24h: number[]   = [];
+  const oi: number[]       = [];
 
   for (const m of markets) {
     const yesPrice = parsePrice(m.yes_ask_dollars) || (100 - parsePrice(m.no_bid_dollars));
@@ -23,14 +24,15 @@ export async function snapshotMarkets(): Promise<number> {
     titles.push(m.title);
     cats.push(m.category ?? inferCategory(m.ticker));
     prices.push(yesPrice);
-    volAll.push(Math.round(parseFloat(m.volume_fp    ?? '0')));
-    vol24h.push(Math.round(parseFloat(m.volume_24h_fp ?? '0')));
+    volAll.push(Math.round(parseFloat(m.volume_fp       ?? '0')));
+    vol24h.push(Math.round(parseFloat(m.volume_24h_fp   ?? '0')));
+    oi.push(Math.round(parseFloat(m.open_interest_fp    ?? '0')));
   }
 
   await db.query(
-    `INSERT INTO market_snapshots (ticker, title, category, yes_price, volume_all, volume_24h)
-     SELECT * FROM UNNEST($1::text[], $2::text[], $3::text[], $4::int[], $5::bigint[], $6::bigint[])`,
-    [tickers, titles, cats, prices, volAll, vol24h]
+    `INSERT INTO market_snapshots (ticker, title, category, yes_price, volume_all, volume_24h, open_interest)
+     SELECT * FROM UNNEST($1::text[], $2::text[], $3::text[], $4::int[], $5::bigint[], $6::bigint[], $7::bigint[])`,
+    [tickers, titles, cats, prices, volAll, vol24h, oi]
   );
 
   await db.query(`DELETE FROM market_snapshots WHERE captured_at < NOW() - INTERVAL '48 hours'`);
@@ -58,6 +60,8 @@ export interface WhaleAlert {
   spike_ratio: number | null;
   readings: number;
   momentum_move: number | null;   // cumulative ¢ move over last 4h (null = no momentum)
+  oi_delta: number;               // open interest change since last snapshot
+  oi_spike_ratio: number | null;  // oi_delta / baseline OI (null if insufficient history)
   rec_side: string | null;        // 'yes'|'no' if a pending high/med rec exists
   rec_edge: number | null;        // edge % of that rec
   rec_confidence: string | null;
@@ -68,11 +72,15 @@ export async function getWhaleAlerts(minAbsVol = 50, minPriceDelta = 8): Promise
   const result = await db.query(`
     WITH intervals AS (
       SELECT
-        ticker, title, category, yes_price, volume_all, captured_at,
+        ticker, title, category, yes_price, volume_all, open_interest, captured_at,
         GREATEST(
-          volume_all - LAG(volume_all) OVER (PARTITION BY ticker ORDER BY captured_at),
+          volume_all    - LAG(volume_all)    OVER (PARTITION BY ticker ORDER BY captured_at),
           0
         )                                                                        AS vol_interval,
+        GREATEST(
+          open_interest - LAG(open_interest) OVER (PARTITION BY ticker ORDER BY captured_at),
+          0
+        )                                                                        AS oi_interval,
         yes_price - LAG(yes_price) OVER (PARTITION BY ticker ORDER BY captured_at) AS price_interval
       FROM market_snapshots
       WHERE captured_at >= NOW() - INTERVAL '26 hours'
@@ -81,6 +89,7 @@ export async function getWhaleAlerts(minAbsVol = 50, minPriceDelta = 8): Promise
       SELECT
         ticker,
         AVG(NULLIF(vol_interval, 0))                          AS avg_vol,
+        AVG(NULLIF(oi_interval, 0))                           AS avg_oi,
         COUNT(*) FILTER (WHERE vol_interval > 0)              AS active_readings
       FROM intervals
       WHERE vol_interval IS NOT NULL
@@ -130,6 +139,11 @@ export async function getWhaleAlerts(minAbsVol = 50, minPriceDelta = 8): Promise
            THEN ROUND(l.vol_interval::numeric / b.avg_vol, 1)
            ELSE NULL
       END                                                      AS spike_ratio,
+      COALESCE(l.oi_interval, 0)                              AS oi_delta,
+      CASE WHEN COALESCE(b.avg_oi, 0) > 1
+           THEN ROUND(l.oi_interval::numeric / b.avg_oi, 1)
+           ELSE NULL
+      END                                                      AS oi_spike_ratio,
       m.cumulative_move                                        AS momentum_move,
       r.side                                                   AS rec_side,
       r.edge_pct                                               AS rec_edge,
@@ -148,6 +162,11 @@ export async function getWhaleAlerts(minAbsVol = 50, minPriceDelta = 8): Promise
         AND COALESCE(b.active_readings, 0) < 5)
       OR ABS(COALESCE(l.price_interval, 0)) >= $2
       OR m.ticker IS NOT NULL
+      -- OI spike: new contracts being created (not just existing holders trading)
+      OR (COALESCE(l.oi_interval, 0) > 0
+          AND COALESCE(b.avg_oi, 0) > 1
+          AND l.oi_interval > 3 * b.avg_oi
+          AND l.oi_interval >= 10)
     )
     ORDER BY
       (r.side IS NOT NULL)::int DESC,
@@ -169,6 +188,8 @@ export async function getWhaleAlerts(minAbsVol = 50, minPriceDelta = 8): Promise
     baseline_avg:    Number(r.baseline_avg),
     spike_ratio:     r.spike_ratio    != null ? Number(r.spike_ratio)    : null,
     readings:        Number(r.readings),
+    oi_delta:        Number(r.oi_delta),
+    oi_spike_ratio:  r.oi_spike_ratio != null ? Number(r.oi_spike_ratio) : null,
     momentum_move:   r.momentum_move  != null ? Number(r.momentum_move)  : null,
     rec_side:        r.rec_side       ?? null,
     rec_edge:        r.rec_edge       != null ? Number(r.rec_edge)       : null,
@@ -201,10 +222,11 @@ async function persistNewEvents(): Promise<number> {
   for (const a of alerts) {
     const signals: string[] = [];
     if (a.vol_delta > 0 && (a.spike_ratio == null || a.spike_ratio >= 3)) signals.push('volume');
-    if (Math.abs(a.price_delta) >= 8)   signals.push('price');
-    if (a.momentum_move != null)         signals.push('momentum');
-    if (a.rec_side != null)              signals.push('ai-match');
-    if (signals.length === 0)            signals.push('volume');
+    if (Math.abs(a.price_delta) >= 8)                                      signals.push('price');
+    if (a.oi_delta > 0 && a.oi_spike_ratio != null && a.oi_spike_ratio >= 3) signals.push('open-interest');
+    if (a.momentum_move != null)                                            signals.push('momentum');
+    if (a.rec_side != null)                                                 signals.push('ai-match');
+    if (signals.length === 0)                                               signals.push('volume');
 
     const res = await db.query(
       `INSERT INTO whale_events

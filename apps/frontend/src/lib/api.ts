@@ -197,6 +197,8 @@ export interface WhaleAlert {
   spike_ratio: number | null;
   readings: number;
   momentum_move: number | null;
+  oi_delta: number;
+  oi_spike_ratio: number | null;
   rec_side: string | null;
   rec_edge: number | null;
   rec_confidence: string | null;

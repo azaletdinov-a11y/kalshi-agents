@@ -104,6 +104,7 @@ CREATE INDEX IF NOT EXISTS idx_market_snapshots_captured_at ON market_snapshots(
 ALTER TABLE market_snapshots ADD COLUMN IF NOT EXISTS volume_all BIGINT DEFAULT 0;
 -- Wipe rows with old schema so detection window starts clean
 DELETE FROM market_snapshots WHERE volume_all = 0;
+ALTER TABLE market_snapshots ADD COLUMN IF NOT EXISTS open_interest BIGINT DEFAULT 0;
 
 CREATE TABLE IF NOT EXISTS whale_events (
   id SERIAL PRIMARY KEY,
