@@ -131,7 +131,16 @@ CREATE TABLE IF NOT EXISTS settings (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 ALTER TABLE bets ADD COLUMN IF NOT EXISTS kalshi_fill_id TEXT UNIQUE;
+ALTER TABLE bets ADD COLUMN IF NOT EXISTS auto_placed BOOLEAN DEFAULT FALSE;
 DELETE FROM bets WHERE fill_price::text = 'NaN' OR amount::text = 'NaN';
+
+CREATE TABLE IF NOT EXISTS bankroll_snapshots (
+  id SERIAL PRIMARY KEY,
+  balance DECIMAL(10,2) NOT NULL,
+  captured_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_bankroll_snapshots_captured_at ON bankroll_snapshots(captured_at DESC);
+
 INSERT INTO settings (key, value) VALUES
   ('auto_bet_enabled', 'false'),
   ('auto_bet_max_per_bet', '3'),
@@ -139,7 +148,8 @@ INSERT INTO settings (key, value) VALUES
   ('auto_bet_min_price', '30'),
   ('auto_bet_max_price', '75'),
   ('auto_bet_max_days', '30'),
-  ('auto_bet_dry_run', 'true')
+  ('auto_bet_dry_run', 'true'),
+  ('whale_spike_multiplier', '3.0')
 ON CONFLICT (key) DO NOTHING;
 `;
 

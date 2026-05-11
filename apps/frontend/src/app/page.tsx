@@ -1,4 +1,5 @@
-import { getStats, getRecommendations, getBets, getBetsClosingSoon, getEvSummary } from '@/lib/api';
+import { getStats, getRecommendations, getBets, getBetsClosingSoon, getEvSummary, getBankrollHistory } from '@/lib/api';
+import type { BankrollSnapshot } from '@/lib/api';
 import { RecommendationCard } from '@/components/RecommendationCard';
 import { PipelineControls } from '@/components/PipelineControls';
 import type { Bet } from '@kalshi/shared';
@@ -6,12 +7,13 @@ import type { Bet } from '@kalshi/shared';
 export const dynamic = 'force-dynamic';
 
 export default async function DashboardPage() {
-  const [stats, recs, allBets, closingSoon, ev] = await Promise.all([
+  const [stats, recs, allBets, closingSoon, ev, bankrollHistory] = await Promise.all([
     getStats().catch((e) => { console.error('[Dashboard] stats error:', e.message); return null; }),
     getRecommendations('pending').catch((e) => { console.error('[Dashboard] recs error:', e.message); return []; }),
     getBets().catch(() => [] as Bet[]),
     getBetsClosingSoon().catch(() => [] as Bet[]),
     getEvSummary().catch(() => null),
+    getBankrollHistory().catch(() => [] as BankrollSnapshot[]),
   ]);
 
   const top = recs.slice(0, 6);
@@ -33,6 +35,7 @@ export default async function DashboardPage() {
               ? timeAgo(stats.last_run.completed_at)
               : 'Never'
           }
+          sub={stats?.last_run ? `${stats.last_run.markets_scanned} markets · ${stats.last_run.recommendations_generated} recs` : undefined}
         />
         <StatCard
           label="Win Rate"
@@ -43,6 +46,13 @@ export default async function DashboardPage() {
           value={stats?.total_resolved ?? '—'}
         />
       </div>
+
+      {bankrollHistory.length >= 2 && (
+        <div className="rounded-xl border border-slate-800 bg-slate-900 p-4">
+          <div className="text-xs text-slate-500 mb-3">Bankroll Equity Curve</div>
+          <BankrollSparkline data={bankrollHistory} />
+        </div>
+      )}
 
       {ev && ev.pending_count > 0 && ev.total_ev != null && ev.total_exposure != null && (
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -124,11 +134,50 @@ function ClosingBetRow({ bet }: { bet: Bet }) {
   );
 }
 
-function StatCard({ label, value }: { label: string; value: string | number }) {
+function StatCard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
   return (
     <div className="rounded-xl border border-slate-800 bg-slate-900 p-4">
       <div className="text-xs text-slate-500 mb-1">{label}</div>
       <div className="text-2xl font-bold">{value}</div>
+      {sub && <div className="text-xs text-slate-600 mt-1">{sub}</div>}
+    </div>
+  );
+}
+
+function BankrollSparkline({ data }: { data: BankrollSnapshot[] }) {
+  const W = 600;
+  const H = 60;
+  const PAD = 4;
+
+  const balances = data.map((d) => d.balance);
+  const min = Math.min(...balances);
+  const max = Math.max(...balances);
+  const range = max - min || 1;
+
+  const pts = data.map((d, i) => {
+    const x = PAD + (i / (data.length - 1)) * (W - PAD * 2);
+    const y = PAD + (1 - (d.balance - min) / range) * (H - PAD * 2);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+
+  const last = balances[balances.length - 1];
+  const first = balances[0];
+  const isUp = last >= first;
+  const color = isUp ? '#34d399' : '#f87171';
+
+  return (
+    <div className="flex items-center gap-4">
+      <svg viewBox={`0 0 ${W} ${H}`} className="flex-1 h-14" preserveAspectRatio="none">
+        <polyline points={pts.join(' ')} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" />
+      </svg>
+      <div className="text-right shrink-0">
+        <div className={`text-lg font-bold ${isUp ? 'text-emerald-400' : 'text-red-400'}`}>
+          ${last.toFixed(2)}
+        </div>
+        <div className={`text-xs ${isUp ? 'text-emerald-600' : 'text-red-600'}`}>
+          {isUp ? '+' : ''}{(last - first).toFixed(2)} all time
+        </div>
+      </div>
     </div>
   );
 }

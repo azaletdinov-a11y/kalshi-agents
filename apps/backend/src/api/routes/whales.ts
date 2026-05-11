@@ -10,8 +10,7 @@ router.get('/', async (req, res) => {
     const minPrice = parseInt((req.query['min_price'] as string) ?? '8');
     const histHours = parseInt((req.query['hours'] as string) ?? '48');
 
-    const [alerts, events, meta] = await Promise.all([
-      getWhaleAlerts(minVol, minPrice),
+    const [events, meta, multRow] = await Promise.all([
       getWhaleEventHistory(histHours),
       db.query(
         `SELECT MAX(captured_at) AS last_snapshot,
@@ -19,7 +18,10 @@ router.get('/', async (req, res) => {
                 COUNT(DISTINCT ticker)::int AS market_count
          FROM market_snapshots`
       ),
+      db.query(`SELECT value FROM settings WHERE key='whale_spike_multiplier'`),
     ]);
+    const spikeMultiplier = parseFloat(multRow.rows[0]?.value ?? '3');
+    const alerts = await getWhaleAlerts(minVol, minPrice, spikeMultiplier);
 
     res.json({
       alerts,

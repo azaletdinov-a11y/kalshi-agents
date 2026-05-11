@@ -49,7 +49,7 @@ export async function runAutoBettor(): Promise<{ placed: number; skipped: number
   }
 
   const activeCount = await db.query(
-    `SELECT COUNT(*) FROM bets WHERE outcome = 'pending' AND kalshi_fill_id LIKE 'auto:%'`
+    `SELECT COUNT(*) FROM bets WHERE outcome = 'pending' AND auto_placed = TRUE`
   );
   if (Number(activeCount.rows[0].count) >= MAX_CONCURRENT) {
     console.log(`[AutoBet] Skipping — ${MAX_CONCURRENT} active auto-bets already open`);
@@ -112,8 +112,8 @@ export async function runAutoBettor(): Promise<{ placed: number; skipped: number
       const order = await placeOrder(rec.market_ticker as string, rec.side as 'yes' | 'no', count, askPrice);
 
       await db.query(
-        `INSERT INTO bets (kalshi_fill_id, recommendation_id, market_ticker, market_title, side, fill_price, amount, close_time, placed_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW())`,
+        `INSERT INTO bets (kalshi_fill_id, recommendation_id, market_ticker, market_title, side, fill_price, amount, close_time, placed_at, auto_placed)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW(),TRUE)`,
         [`auto:${order.order_id}`, rec.id, rec.market_ticker, rec.market_title, rec.side, askPrice, actualAmount, rec.close_time]
       );
 

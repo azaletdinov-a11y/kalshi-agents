@@ -41,6 +41,34 @@ router.get('/auto-bet', async (_req, res) => {
   });
 });
 
+router.get('/bankroll/history', async (_req, res) => {
+  const result = await db.query(
+    `SELECT balance, captured_at FROM bankroll_snapshots ORDER BY captured_at ASC LIMIT 500`
+  );
+  res.json(result.rows.map((r) => ({
+    balance: Number(r.balance),
+    captured_at: r.captured_at,
+  })));
+});
+
+router.get('/whale', async (_req, res) => {
+  const result = await db.query(`SELECT value FROM settings WHERE key='whale_spike_multiplier'`);
+  res.json({ spike_multiplier: parseFloat(result.rows[0]?.value ?? '3') });
+});
+
+router.patch('/whale', async (req, res) => {
+  const { spike_multiplier } = req.body;
+  if (spike_multiplier == null || isNaN(Number(spike_multiplier))) {
+    return res.status(400).json({ error: 'spike_multiplier required' });
+  }
+  await db.query(
+    `INSERT INTO settings (key, value) VALUES ('whale_spike_multiplier', $1)
+     ON CONFLICT (key) DO UPDATE SET value=$1`,
+    [String(spike_multiplier)]
+  );
+  res.json({ ok: true, spike_multiplier: Number(spike_multiplier) });
+});
+
 router.patch('/auto-bet', async (req, res) => {
   const { enabled, max_per_bet, min_edge, min_price, max_price, max_days, dry_run } = req.body;
   const updates: [string, string][] = [];

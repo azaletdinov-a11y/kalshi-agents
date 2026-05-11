@@ -62,6 +62,17 @@ export async function runPipeline(): Promise<{ marketsScanned: number; recommend
       `[Pipeline] Done — ${marketsScanned} markets, ${recommendationsGenerated} recommendations`
     );
 
+    // Snapshot current bankroll for equity curve (re-fetch post-bets balance)
+    try {
+      const currentBankroll = await fetchBankroll();
+      await db.query(
+        `INSERT INTO bankroll_snapshots (balance) VALUES ($1)`,
+        [Math.round(currentBankroll * 100) / 100]
+      );
+    } catch (e) {
+      console.error('[Pipeline] Bankroll snapshot failed:', e);
+    }
+
     // Auto-bet after recommendations are generated
     try {
       const autoBet = await runAutoBettor();

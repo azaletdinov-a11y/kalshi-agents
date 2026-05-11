@@ -232,6 +232,15 @@ export async function getWhales(minVol = 50, minPrice = 8): Promise<WhaleData> {
   return get<WhaleData>(`/api/whales?min_vol=${minVol}&min_price=${minPrice}`);
 }
 
+export interface BankrollSnapshot {
+  balance: number;
+  captured_at: string;
+}
+
+export async function getBankrollHistory(): Promise<BankrollSnapshot[]> {
+  return get<BankrollSnapshot[]>('/api/settings/bankroll/history');
+}
+
 export async function getKalshiBalance(): Promise<KalshiBalance | null> {
   try {
     return await get<KalshiBalance>('/api/bets/kalshi-balance');

@@ -49,6 +49,7 @@ export async function researchMarket(market: KalshiMarketRaw): Promise<ResearchR
     parts.push('=== News Headlines ===\n' + newsText.value);
   }
   if (parts.length === 0) {
+    console.warn(`[Researcher] All sources failed for "${query}" (${market.ticker})`);
     parts.push('No research data available — base estimate on market price and base rates.');
   }
 

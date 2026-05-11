@@ -39,7 +39,9 @@ export async function snapshotMarkets(): Promise<number> {
 
   console.log(`[WhaleHunter] Snapshotted ${tickers.length} markets`);
 
-  const persisted = await persistNewEvents();
+  const multRow = await db.query(`SELECT value FROM settings WHERE key='whale_spike_multiplier'`);
+  const spikeMultiplier = parseFloat(multRow.rows[0]?.value ?? '3');
+  const persisted = await persistNewEvents(spikeMultiplier);
   if (persisted > 0) console.log(`[WhaleHunter] Persisted ${persisted} new whale event(s)`);
 
   return tickers.length;
@@ -68,7 +70,7 @@ export interface WhaleAlert {
   captured_at: string;
 }
 
-export async function getWhaleAlerts(minAbsVol = 50, minPriceDelta = 8): Promise<WhaleAlert[]> {
+export async function getWhaleAlerts(minAbsVol = 50, minPriceDelta = 8, spikeMultiplier = 3): Promise<WhaleAlert[]> {
   const result = await db.query(`
     WITH intervals AS (
       SELECT
@@ -156,7 +158,7 @@ export async function getWhaleAlerts(minAbsVol = 50, minPriceDelta = 8): Promise
     WHERE (
       (COALESCE(l.vol_interval, 0) > 0
         AND COALESCE(b.avg_vol, 0) > 1
-        AND l.vol_interval > 3 * b.avg_vol
+        AND l.vol_interval > $3 * b.avg_vol
         AND l.vol_interval >= 10)
       OR (COALESCE(l.vol_interval, 0) >= $1
         AND COALESCE(b.active_readings, 0) < 5)
@@ -165,7 +167,7 @@ export async function getWhaleAlerts(minAbsVol = 50, minPriceDelta = 8): Promise
       -- OI spike: new contracts being created (not just existing holders trading)
       OR (COALESCE(l.oi_interval, 0) > 0
           AND COALESCE(b.avg_oi, 0) > 1
-          AND l.oi_interval > 3 * b.avg_oi
+          AND l.oi_interval > $3 * b.avg_oi
           AND l.oi_interval >= 10)
     )
     ORDER BY
@@ -174,7 +176,7 @@ export async function getWhaleAlerts(minAbsVol = 50, minPriceDelta = 8): Promise
            THEN l.vol_interval::float / b.avg_vol ELSE 0 END DESC,
       COALESCE(l.vol_interval, 0) DESC
     LIMIT 50
-  `, [minAbsVol, minPriceDelta]);
+  `, [minAbsVol, minPriceDelta, spikeMultiplier]);
 
   return result.rows.map((r) => ({
     ticker:          r.ticker,
@@ -215,15 +217,15 @@ export interface WhaleEvent {
   detected_at: string;
 }
 
-async function persistNewEvents(): Promise<number> {
-  const alerts = await getWhaleAlerts();
+async function persistNewEvents(spikeMultiplier = 3): Promise<number> {
+  const alerts = await getWhaleAlerts(50, 8, spikeMultiplier);
   let count = 0;
 
   for (const a of alerts) {
     const signals: string[] = [];
-    if (a.vol_delta > 0 && (a.spike_ratio == null || a.spike_ratio >= 3)) signals.push('volume');
-    if (Math.abs(a.price_delta) >= 8)                                      signals.push('price');
-    if (a.oi_delta > 0 && a.oi_spike_ratio != null && a.oi_spike_ratio >= 3) signals.push('open-interest');
+    if (a.vol_delta > 0 && (a.spike_ratio == null || a.spike_ratio >= spikeMultiplier)) signals.push('volume');
+    if (Math.abs(a.price_delta) >= 8)                                                   signals.push('price');
+    if (a.oi_delta > 0 && a.oi_spike_ratio != null && a.oi_spike_ratio >= spikeMultiplier) signals.push('open-interest');
     if (a.momentum_move != null)                                            signals.push('momentum');
     if (a.rec_side != null)                                                 signals.push('ai-match');
     if (signals.length === 0)                                               signals.push('other');
