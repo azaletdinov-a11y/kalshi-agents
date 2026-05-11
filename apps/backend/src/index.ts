@@ -100,6 +100,28 @@ CREATE TABLE IF NOT EXISTS market_snapshots (
 CREATE INDEX IF NOT EXISTS idx_market_snapshots_ticker_time ON market_snapshots(ticker, captured_at DESC);
 CREATE INDEX IF NOT EXISTS idx_market_snapshots_captured_at ON market_snapshots(captured_at DESC);
 
+-- Phase 2: replace volume_24h (rolling, noisy) with volume_all (all-time, monotonic)
+ALTER TABLE market_snapshots ADD COLUMN IF NOT EXISTS volume_all BIGINT DEFAULT 0;
+-- Wipe rows with old schema so detection window starts clean
+DELETE FROM market_snapshots WHERE volume_all = 0;
+
+CREATE TABLE IF NOT EXISTS whale_events (
+  id SERIAL PRIMARY KEY,
+  ticker TEXT NOT NULL,
+  title TEXT,
+  category TEXT,
+  yes_price INT,
+  prev_price INT,
+  price_delta INT,
+  vol_delta BIGINT,
+  vol_delta_usd INT,
+  spike_ratio NUMERIC(6,1),
+  signals TEXT[],
+  detected_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_whale_events_detected_at ON whale_events(detected_at DESC);
+CREATE INDEX IF NOT EXISTS idx_whale_events_ticker ON whale_events(ticker, detected_at DESC);
+
 CREATE TABLE IF NOT EXISTS settings (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL,

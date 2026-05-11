@@ -30,8 +30,8 @@ export function startScheduler(): void {
     }
   });
 
-  // Snapshot top markets every 15 min for whale detection
-  cron.schedule('*/15 * * * *', async () => {
+  // Full market snapshot every 30 min — fetches all ~2000+ open markets for complete coverage
+  cron.schedule('*/30 * * * *', async () => {
     try {
       await snapshotMarkets();
     } catch (err) {

@@ -1,24 +1,32 @@
 import { Router } from 'express';
-import { getWhaleAlerts, snapshotMarkets } from '../../agents/whale-hunter';
+import { getWhaleAlerts, getWhaleEventHistory, snapshotMarkets } from '../../agents/whale-hunter';
 import { db } from '../../db/client';
 
 const router = Router();
 
 router.get('/', async (req, res) => {
   try {
-    const minVol   = parseInt((req.query['min_vol']   as string) ?? '100');
+    const minVol   = parseInt((req.query['min_vol']   as string) ?? '50');
     const minPrice = parseInt((req.query['min_price'] as string) ?? '8');
-    const alerts = await getWhaleAlerts(minVol, minPrice);
+    const histHours = parseInt((req.query['hours'] as string) ?? '48');
 
-    const meta = await db.query(
-      `SELECT MAX(captured_at) AS last_snapshot, COUNT(DISTINCT captured_at)::int AS snapshot_count
-       FROM market_snapshots`
-    );
+    const [alerts, events, meta] = await Promise.all([
+      getWhaleAlerts(minVol, minPrice),
+      getWhaleEventHistory(histHours),
+      db.query(
+        `SELECT MAX(captured_at) AS last_snapshot,
+                COUNT(DISTINCT captured_at)::int AS snapshot_count,
+                COUNT(DISTINCT ticker)::int AS market_count
+         FROM market_snapshots`
+      ),
+    ]);
 
     res.json({
       alerts,
-      last_snapshot:   meta.rows[0].last_snapshot ?? null,
-      snapshot_count:  meta.rows[0].snapshot_count ?? 0,
+      events,
+      last_snapshot:  meta.rows[0].last_snapshot ?? null,
+      snapshot_count: meta.rows[0].snapshot_count ?? 0,
+      market_count:   meta.rows[0].market_count ?? 0,
     });
   } catch (err) {
     console.error('[Whales] GET error:', err);

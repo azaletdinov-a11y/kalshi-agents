@@ -191,20 +191,38 @@ export interface WhaleAlert {
   yes_price: number;
   prev_price: number;
   price_delta: number;
-  volume_24h: number;
-  prev_vol24h: number;
   vol_delta: number;
   vol_delta_usd: number;
+  baseline_avg: number;
+  spike_ratio: number | null;
+  readings: number;
   captured_at: string;
+}
+
+export interface WhaleEvent {
+  id: number;
+  ticker: string;
+  title: string;
+  category: string;
+  yes_price: number;
+  prev_price: number;
+  price_delta: number;
+  vol_delta: number;
+  vol_delta_usd: number;
+  spike_ratio: number | null;
+  signals: string[];
+  detected_at: string;
 }
 
 export interface WhaleData {
   alerts: WhaleAlert[];
+  events: WhaleEvent[];
   last_snapshot: string | null;
   snapshot_count: number;
+  market_count: number;
 }
 
-export async function getWhales(minVol = 100, minPrice = 8): Promise<WhaleData> {
+export async function getWhales(minVol = 50, minPrice = 8): Promise<WhaleData> {
   return get<WhaleData>(`/api/whales?min_vol=${minVol}&min_price=${minPrice}`);
 }
 
