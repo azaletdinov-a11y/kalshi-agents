@@ -5,6 +5,7 @@ import { CalibrationChart } from '@/components/CalibrationChart';
 import { BankrollEditor } from '@/components/BankrollEditor';
 import { SyncKalshiButton } from '@/components/SyncKalshiButton';
 import { AutoBetSettings } from '@/components/AutoBetSettings';
+import { CancelBetButton } from '@/components/CancelBetButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -167,6 +168,7 @@ export default async function PnlPage() {
                     <td className="px-4 py-3 text-right">
                       <span className="flex items-center justify-end gap-3">
                         <EditBetButton bet={b} />
+                        {b.outcome === 'pending' && <CancelBetButton id={b.id} />}
                         <DeleteBetButton id={b.id} />
                       </span>
                     </td>

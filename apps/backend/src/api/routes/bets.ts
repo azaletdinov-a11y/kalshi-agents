@@ -103,9 +103,20 @@ router.post('/', async (req, res) => {
 });
 
 router.patch('/:id', async (req, res) => {
-  const { fill_price, amount } = req.body;
+  const { fill_price, amount, outcome } = req.body;
+
+  // Allow marking as cancelled directly
+  if (outcome === 'cancelled') {
+    const result = await db.query(
+      `UPDATE bets SET outcome='cancelled' WHERE id=$1 AND outcome='pending' RETURNING *`,
+      [req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Bet not found or already resolved' });
+    return res.json(normalizeBet(result.rows[0]));
+  }
+
   if (fill_price == null && amount == null) {
-    return res.status(400).json({ error: 'fill_price or amount required' });
+    return res.status(400).json({ error: 'fill_price, amount, or outcome=cancelled required' });
   }
   const fields: string[] = [];
   const vals: unknown[] = [];
